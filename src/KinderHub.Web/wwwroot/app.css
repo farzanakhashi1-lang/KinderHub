@@ -1421,3 +1421,172 @@ a {
         gap: 0;
     }
 }
+
+/* ---------- 14. Charts, history, status (Steps 11-12) ---------- */
+/* Chart colors: fixed slots, checked for color-blind safety in light and dark mode */
+.app-shell {
+    --kh-series-1: #6c5ce7;
+    --kh-series-2: #ff8a5b;
+}
+
+.app-shell[data-bs-theme="dark"] {
+    --kh-series-1: #8b7cf6;
+    --kh-series-2: #dc6a36;
+}
+
+.chart-card {
+    margin-bottom: 1.25rem;
+}
+
+.kh-chart-top {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: .5rem;
+}
+
+.kh-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--kh-muted);
+}
+
+.kh-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.kh-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.kh-swatch.kh-series-1 { background: var(--kh-series-1); }
+.kh-swatch.kh-series-2 { background: var(--kh-series-2); }
+
+.kh-chart-canvas {
+    position: relative;
+}
+
+.kh-chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+}
+
+.kh-chart-svg path.kh-series-1, .kh-chart-svg rect.kh-series-1 { fill: var(--kh-series-1); }
+.kh-chart-svg path.kh-series-2, .kh-chart-svg rect.kh-series-2 { fill: var(--kh-series-2); }
+
+.kh-grid {
+    stroke: var(--kh-border);
+    stroke-width: 1;
+}
+
+.kh-grid.base {
+    stroke: var(--kh-muted);
+    stroke-opacity: .5;
+}
+
+.kh-axis-text {
+    fill: var(--kh-muted);
+    font-size: 11px;
+    font-family: inherit;
+}
+
+.kh-bar-hit {
+    fill: transparent;
+}
+
+.kh-bar-col {
+    cursor: default;
+    outline: none;
+}
+
+.kh-bar-col.active .kh-bar-hit,
+.kh-bar-col:focus-visible .kh-bar-hit {
+    fill: var(--kh-surface-2);
+}
+
+.kh-tooltip {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    min-width: 140px;
+    padding: .55rem .7rem;
+    border-radius: var(--kh-radius-sm);
+    background: var(--kh-surface);
+    border: 1px solid var(--kh-border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+    pointer-events: none;
+    font-size: .82rem;
+    z-index: 5;
+}
+
+.kh-tooltip-title {
+    font-weight: 800;
+    margin-bottom: .25rem;
+}
+
+.kh-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--kh-muted);
+}
+
+.kh-tooltip-row strong {
+    margin-left: auto;
+    color: var(--kh-text);
+}
+
+/* Virtual scrolling table */
+.virtual-scroll {
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+.virtual-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.virtual-scroll .kh-table td {
+    height: 53px;
+}
+
+/* System status */
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .5rem 0;
+}
+
+.info-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .45rem 1rem;
+    margin: 0;
+}
+
+.info-list dt {
+    color: var(--kh-muted);
+    font-weight: 600;
+}
+
+.info-list dd {
+    margin: 0;
+    font-weight: 700;
+    word-break: break-word;
+}

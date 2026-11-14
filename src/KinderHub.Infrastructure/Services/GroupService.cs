@@ -2,22 +2,34 @@ using KinderHub.Application.Common;
 using KinderHub.Application.DTOs;
 using KinderHub.Application.Interfaces;
 using KinderHub.Domain.Entities;
+using KinderHub.Infrastructure.Caching;
 using KinderHub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace KinderHub.Infrastructure.Services;
 
-public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogger<GroupService> logger) : IGroupService
+public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, IMemoryCache cache, ILogger<GroupService> logger) : IGroupService
 {
+    // Groups are read on almost every page but change rarely, so we keep them in memory for 5 minutes.
+    // Any change to groups or children removes the cached copy (see Invalidate).
     public async Task<IReadOnlyList<GroupDto>> GetAllAsync(CancellationToken ct = default)
     {
+        if (cache.TryGetValue(CacheKeys.AllGroups, out IReadOnlyList<GroupDto>? cached) && cached is not null)
+            return cached;
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Groups.AsNoTracking()
+        IReadOnlyList<GroupDto> groups = await db.Groups.AsNoTracking()
             .OrderBy(g => g.Name)
             .Select(g => new GroupDto(g.Id, g.Name, g.AgeRange, g.Room, g.TeacherName, g.Capacity, g.Children.Count))
             .ToListAsync(ct);
+
+        cache.Set(CacheKeys.AllGroups, groups, TimeSpan.FromMinutes(5));
+        return groups;
     }
+
+    private void Invalidate() => cache.Remove(CacheKeys.AllGroups);
 
     public async Task<GroupDto?> GetByIdAsync(int id, CancellationToken ct = default)
     {
@@ -46,6 +58,7 @@ public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         {
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Group {GroupId} created", group.Id);
+            Invalidate();
             return Result<int>.Success(group.Id);
         }
         catch (DbUpdateException ex)
@@ -76,6 +89,7 @@ public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         try
         {
             await db.SaveChangesAsync(ct);
+            Invalidate();
             return Result.Success();
         }
         catch (DbUpdateException ex)
@@ -97,6 +111,7 @@ public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         try
         {
             await db.SaveChangesAsync(ct);
+            Invalidate();
             return Result.Success();
         }
         catch (DbUpdateException ex)

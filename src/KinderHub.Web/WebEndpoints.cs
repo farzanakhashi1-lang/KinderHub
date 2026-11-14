@@ -1,5 +1,8 @@
 using System.Text.Json;
+using KinderHub.Application.Common;
+using KinderHub.Application.Interfaces;
 using KinderHub.Web.Realtime;
+using KinderHub.Web.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -15,6 +18,15 @@ public static class WebEndpoints
 
         // Health check: open http://localhost:5161/health
         app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteHealthJsonAsync });
+
+        // CSV export of attendance (only Admin and Teacher)
+        app.MapGet("/export/attendance.csv", async (int? groupId, IAttendanceService attendance, CancellationToken ct) =>
+            {
+                var page = await attendance.GetHistoryAsync(groupId, 0, 10_000, ct);
+                var file = CsvExporter.Attendance(page.Items);
+                return Results.File(file, "text/csv; charset=utf-8", $"attendance-{DateTime.Today:yyyy-MM-dd}.csv");
+            })
+            .RequireAuthorization(policy => policy.RequireRole(Roles.Admin, Roles.Teacher));
     }
 
     private static Task WriteHealthJsonAsync(HttpContext context, HealthReport report)

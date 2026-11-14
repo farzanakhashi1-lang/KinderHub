@@ -111,4 +111,26 @@ public class AttendanceService(
 
         return Result.Failure("Could not save attendance. Please refresh and try again.");
     }
+
+    public async Task<PagedResult<AttendanceDto>> GetHistoryAsync(int? groupId, int skip, int take, CancellationToken ct = default)
+    {
+        skip = Math.Max(0, skip);
+        take = Math.Clamp(take, 1, 10_000);
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var query = db.AttendanceRecords.AsNoTracking().AsQueryable();
+        if (groupId is > 0)
+            query = query.Where(a => a.Child.GroupId == groupId);
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(a => a.Date).ThenBy(a => a.Child.FirstName)
+            .Skip(skip)
+            .Take(take)
+            .Select(a => new AttendanceDto(a.Id, a.ChildId, a.Child.FirstName + " " + a.Child.LastName, a.Date,
+                a.Status, a.CheckInTime, a.CheckOutTime, a.PickedUpBy, a.Note))
+            .ToListAsync(ct);
+
+        return new PagedResult<AttendanceDto>(items, total, skip / take + 1, take);
+    }
 }

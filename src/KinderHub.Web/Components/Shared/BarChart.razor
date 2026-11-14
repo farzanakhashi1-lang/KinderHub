@@ -1,0 +1,196 @@
+@* Reusable stacked bar chart drawn with SVG (no JavaScript library needed).
+   - Colors come from CSS variables, so it works in light AND dark mode.
+   - Hover / keyboard focus shows a tooltip with exact numbers.
+   - "Table" button shows the same data as a table (accessibility). *@
+
+<div class="kh-chart">
+    <div class="kh-chart-top">
+        @if (Series.Count > 1)
+        {
+            <ul class="kh-legend" aria-label="Legend">
+                @foreach (var s in Series)
+                {
+                    <li @key="s.Name"><span class="kh-swatch kh-series-@s.ColorSlot" aria-hidden="true"></span>@s.Name</li>
+                }
+            </ul>
+        }
+        <button type="button" class="btn btn-sm btn-light ms-auto" @onclick="() => showTable = !showTable" aria-pressed="@(showTable ? "true" : "false")">
+            <Icon Name="@(showTable ? "bar-chart" : "grid")" Size="16" /> @(showTable ? "Chart" : "Table")
+        </button>
+    </div>
+
+    @if (Labels.Count == 0)
+    {
+        <EmptyState Title="No data yet" Message="The chart appears when there is data." IconName="bar-chart" />
+    }
+    else if (showTable)
+    {
+        <div class="kh-table-wrap">
+            <table class="kh-table">
+                <caption class="visually-hidden">@Title</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Day</th>
+                        @foreach (var s in Series)
+                        {
+                            <th scope="col">@s.Name</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Labels.Count; i++)
+                    {
+                        var index = i;
+                        <tr>
+                            <th scope="row">@Labels[index]</th>
+                            @foreach (var s in Series)
+                            {
+                                <td>@Format(ValueAt(s, index))</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="kh-chart-canvas">
+            <svg viewBox="0 0 @N(Width) @Height" role="img" aria-label="@Title" class="kh-chart-svg">
+                @* Grid lines + y labels (recessive) *@
+                @for (var g = 0; g <= GridLines; g++)
+                {
+                    var value = niceMax * g / GridLines;
+                    var y = Y(value);
+                    @* Wrapped in <g>: in Razor code, a <text> tag right after C# has a special meaning *@
+                    <g>
+                        <line x1="@PadLeft" x2="@N(Width - PadRight)" y1="@N(y)" y2="@N(y)" class="kh-grid @(g == 0 ? "base" : "")" />
+                        <text x="@(PadLeft - 8)" y="@N(y + 4)" text-anchor="end" class="kh-axis-text">@Format(value)</text>
+                    </g>
+                }
+
+                @for (var i = 0; i < Labels.Count; i++)
+                {
+                    var index = i;
+                    var slotX = PadLeft + index * SlotWidth;
+                    var barX = slotX + (SlotWidth - BarWidth) / 2;
+                    var baseY = Y(0);
+                    var topIndex = TopSeriesIndex(index);
+
+                    <g class="kh-bar-col @(hovered == index ? "active" : "")" tabindex="0"
+                       aria-label="@Describe(index)"
+                       @onmouseenter="() => hovered = index" @onmouseleave="() => hovered = null"
+                       @onfocus="() => hovered = index" @onblur="() => hovered = null">
+                        <rect class="kh-bar-hit" x="@N(slotX)" y="@PadTop" width="@N(SlotWidth)" height="@N(PlotHeight)" />
+                        @{ var currentY = baseY; }
+                        @for (var s = 0; s < Series.Count; s++)
+                        {
+                            var series = Series[s];
+                            var h = ValueAt(series, index) / niceMax * PlotHeight;
+                            if (h <= 0) continue;
+                            var gap = s == 0 ? 0 : SegmentGap;
+                            var top = currentY - h;
+                            var drawH = Math.Max(0, h - gap);
+                            if (s == topIndex)
+                            {
+                                <path class="kh-series-@series.ColorSlot" d="@TopRounded(barX, top, BarWidth, drawH, 4)" />
+                            }
+                            else
+                            {
+                                <rect class="kh-series-@series.ColorSlot" x="@N(barX)" y="@N(top)" width="@N(BarWidth)" height="@N(drawH)" />
+                            }
+                            currentY = top;
+                        }
+                        @if (ShowEveryLabel || index % 2 == 0)
+                        {
+                            <g>
+                                <text x="@N(slotX + SlotWidth / 2)" y="@(Height - 8)" text-anchor="middle" class="kh-axis-text">@Labels[index]</text>
+                            </g>
+                        }
+                    </g>
+                }
+            </svg>
+
+            @if (hovered is int h0 && h0 < Labels.Count)
+            {
+                <div class="kh-tooltip" style="left:@N((PadLeft + (h0 + 0.5) * SlotWidth) / Width * 100)%">
+                    <div class="kh-tooltip-title">@Labels[h0]</div>
+                    @foreach (var s in Series)
+                    {
+                        <div class="kh-tooltip-row">
+                            <span class="kh-swatch kh-series-@s.ColorSlot" aria-hidden="true"></span>
+                            <span>@s.Name</span>
+                            <strong>@Format(ValueAt(s, h0))</strong>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<string> Labels { get; set; } = Array.Empty<string>();
+    [Parameter, EditorRequired] public IReadOnlyList<ChartSeries> Series { get; set; } = Array.Empty<ChartSeries>();
+    [Parameter] public int Height { get; set; } = 240;
+
+    private const int PadLeft = 36;
+    private const int PadRight = 8;
+    private const int PadTop = 12;
+    private const int PadBottom = 30;
+    private const int GridLines = 4;
+    private const double SegmentGap = 2;
+
+    private int? hovered;
+    private bool showTable;
+    private double niceMax = 1;
+
+    private double Width => Math.Max(360, Labels.Count * 52 + PadLeft + PadRight);
+    private double PlotHeight => Height - PadTop - PadBottom;
+    private double SlotWidth => (Width - PadLeft - PadRight) / Math.Max(1, Labels.Count);
+    private double BarWidth => Math.Min(28, SlotWidth * 0.6);
+    private bool ShowEveryLabel => Labels.Count <= 10;
+
+    protected override void OnParametersSet()
+    {
+        var maxTotal = 0d;
+        for (var i = 0; i < Labels.Count; i++)
+            maxTotal = Math.Max(maxTotal, Series.Sum(s => ValueAt(s, i)));
+        niceMax = NiceMax(maxTotal);
+        if (hovered >= Labels.Count) hovered = null;
+    }
+
+    private double Y(double value) => PadTop + PlotHeight - value / niceMax * PlotHeight;
+
+    private static double ValueAt(ChartSeries s, int i) => i < s.Values.Count ? s.Values[i] : 0;
+
+    private int TopSeriesIndex(int i)
+    {
+        for (var s = Series.Count - 1; s >= 0; s--)
+            if (ValueAt(Series[s], i) > 0) return s;
+        return -1;
+    }
+
+    // Rounds the top so the axis has easy numbers (4, 8, 12...)
+    private static double NiceMax(double max)
+    {
+        if (max <= 0) return GridLines;
+        var step = Math.Ceiling(max / GridLines);
+        return step * GridLines;
+    }
+
+    private string Describe(int i) =>
+        $"{Labels[i]}: " + string.Join(", ", Series.Select(s => $"{s.Name} {Format(ValueAt(s, i))}"));
+
+    private static string Format(double value) => value.ToString("0.#");
+
+    // SVG numbers always with a dot (not a comma), whatever the computer language is
+    private static string N(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string TopRounded(double x, double y, double w, double h, double r)
+    {
+        r = Math.Min(r, Math.Min(w / 2, h));
+        return $"M{N(x)},{N(y + h)} V{N(y + r)} Q{N(x)},{N(y)} {N(x + r)},{N(y)} H{N(x + w - r)} Q{N(x + w)},{N(y)} {N(x + w)},{N(y + r)} V{N(y + h)} Z";
+    }
+}

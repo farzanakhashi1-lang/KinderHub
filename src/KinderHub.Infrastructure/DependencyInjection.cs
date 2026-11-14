@@ -17,6 +17,9 @@ public static class DependencyInjection
             options.UseSqlite(connectionString, sqlite =>
                 sqlite.ExecutionStrategy(deps => new SqliteRetryStrategy(deps))));
 
+        // In-memory cache for data that is read often and changes rarely (groups)
+        services.AddMemoryCache();
+
         // Services: pages ask for the INTERFACE, they get this implementation
         services.AddScoped<IGroupService, GroupService>();
         services.AddScoped<IChildService, ChildService>();

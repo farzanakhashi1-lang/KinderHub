@@ -3,13 +3,15 @@ using KinderHub.Application.Common;
 using KinderHub.Application.DTOs;
 using KinderHub.Application.Interfaces;
 using KinderHub.Domain.Entities;
+using KinderHub.Infrastructure.Caching;
 using KinderHub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace KinderHub.Infrastructure.Services;
 
-public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogger<ChildService> logger) : IChildService
+public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, IMemoryCache cache, ILogger<ChildService> logger) : IChildService
 {
     // Converts a Child (database) into a ChildDto (page) inside the SQL query,
     // so only the needed columns are loaded.
@@ -106,6 +108,7 @@ public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         {
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Child {ChildId} created", child.Id);
+            cache.Remove(CacheKeys.AllGroups); // group counts changed
             return Result<int>.Success(child.Id);
         }
         catch (DbUpdateException ex)
@@ -135,6 +138,7 @@ public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         try
         {
             await db.SaveChangesAsync(ct);
+            cache.Remove(CacheKeys.AllGroups);
             return Result.Success();
         }
         catch (DbUpdateException ex)
@@ -155,6 +159,7 @@ public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
         {
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Child {ChildId} deleted", id);
+            cache.Remove(CacheKeys.AllGroups);
             return Result.Success();
         }
         catch (DbUpdateException ex)

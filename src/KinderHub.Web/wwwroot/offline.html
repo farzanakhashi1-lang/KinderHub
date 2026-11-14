@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · KinderHub</title>
+    <style>
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f5f6fb; color: #1e2133; }
+        .card { max-width: 420px; margin: 1rem; padding: 2rem; text-align: center; background: #fff; border-radius: 16px; box-shadow: 0 6px 18px rgba(16,24,40,.08); }
+        img { width: 72px; height: 72px; }
+        h1 { font-size: 1.4rem; margin: 1rem 0 .5rem; }
+        p { color: #6b7086; }
+        button { margin-top: 1rem; padding: .7rem 1.4rem; border: 0; border-radius: 10px; background: #6c5ce7; color: #fff; font-weight: 700; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="icon-192.png" alt="" />
+        <h1>You are offline</h1>
+        <p>KinderHub needs an internet connection to show live attendance and reports. Please check your connection.</p>
+        <button onclick="location.reload()">Try again</button>
+    </div>
+</body>
+</html>

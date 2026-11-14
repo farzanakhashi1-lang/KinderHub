@@ -20,8 +20,11 @@
         <NavLink class="kh-nav-link" href="children">
             <Icon Name="users" /><span>Children</span>
         </NavLink>
-        <NavLink class="kh-nav-link" href="attendance">
+        <NavLink class="kh-nav-link" href="attendance" Match="NavLinkMatch.All">
             <Icon Name="check-square" /><span>Attendance</span>
+        </NavLink>
+        <NavLink class="kh-nav-link" href="attendance/history">
+            <Icon Name="calendar" /><span>History &amp; export</span>
         </NavLink>
         <NavLink class="kh-nav-link" href="reports">
             <Icon Name="clipboard" /><span>Daily reports</span>
@@ -32,6 +35,9 @@
     <AuthorizeView Roles="Admin">
         <NavLink class="kh-nav-link" href="groups">
             <Icon Name="layers" /><span>Groups</span>
+        </NavLink>
+        <NavLink class="kh-nav-link" href="admin/status">
+            <Icon Name="activity" /><span>System status</span>
         </NavLink>
     </AuthorizeView>
 

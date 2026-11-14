@@ -65,6 +65,13 @@
                     <StatCard Title="Attendance, 14 days" Value="@($"{stats.AttendanceRate14Days}%")" IconName="bar-chart" Color="accent" />
                 </div>
 
+                <div class="kh-card chart-card">
+                    <h2 class="kh-card-title">Attendance, last 14 days</h2>
+                    <BarChart Title="Children present and absent per day, last 14 days"
+                              Labels="@(stats.AttendanceTrend.Select(p => p.Date.ToString("dd.MM")).ToList())"
+                              Series="@TrendSeries()" />
+                </div>
+
                 <div class="card-grid">
                     <div class="kh-card">
                         <h2 class="kh-card-title">Groups</h2>
@@ -131,6 +138,15 @@
             Notifier.AttendanceChanged += OnAttendanceChanged; // live dashboard
         }
     }
+
+    // Two series for the chart. Colors are fixed slots (1 = present, 2 = absent), checked for color-blind safety.
+    private IReadOnlyList<ChartSeries> TrendSeries() => stats is null
+        ? Array.Empty<ChartSeries>()
+        : new List<ChartSeries>
+        {
+            new("Present", stats.AttendanceTrend.Select(p => (double)p.Present).ToList(), 1),
+            new("Absent", stats.AttendanceTrend.Select(p => (double)p.Absent).ToList(), 2)
+        };
 
     private bool isReloading;
     private bool reloadPending;

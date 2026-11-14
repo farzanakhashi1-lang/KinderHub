@@ -1,0 +1,102 @@
+@page "/attendance/history"
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@attribute [Authorize(Roles = "Admin,Teacher")]
+@inject IAttendanceService AttendanceService
+@inject IGroupService GroupService
+
+<PageTitle>Attendance history · KinderHub</PageTitle>
+
+<PageHeader Title="Attendance history" Subtitle="@($"{totalCount} records. Rows are loaded only while you scroll.")">
+    <Actions>
+        @* target="_blank" + download: the browser downloads the file, Blazor does not try to open it as a page *@
+        <a class="btn btn-outline-primary" href="@ExportUrl" target="_blank" download>
+            <Icon Name="download" Size="18" /> Export CSV
+        </a>
+    </Actions>
+</PageHeader>
+
+<div class="kh-toolbar">
+    <select class="form-select kh-filter" aria-label="Filter by group" @onchange="OnGroupChangedAsync">
+        <option value="">All groups</option>
+        @foreach (var g in groups)
+        {
+            <option value="@g.Id" selected="@(groupId == g.Id)">@g.Name</option>
+        }
+    </select>
+</div>
+
+<div class="kh-table-wrap virtual-scroll" tabindex="0" aria-label="Attendance records">
+    <table class="kh-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Child</th>
+                <th>Status</th>
+                <th>Check-in</th>
+                <th>Check-out</th>
+                <th>Picked up by</th>
+            </tr>
+        </thead>
+        <tbody>
+            @* Virtualize renders ONLY the rows you can see (+ a few extra).
+               With 10 000 records, the page still has about 30 rows in the browser. *@
+            <Virtualize @ref="virtualize" TItem="AttendanceDto" ItemsProvider="LoadRowsAsync"
+                        ItemSize="53" OverscanCount="10" SpacerElement="tr" Context="a">
+                <ItemContent>
+                    <tr @key="a.Id">
+                        <td>@a.Date.ToString("ddd, dd.MM.yyyy")</td>
+                        <td class="cell-main">@a.ChildName</td>
+                        <td><AttendanceBadge Status="a.Status" /></td>
+                        <td>@(a.CheckInTime?.ToString("HH:mm") ?? "—")</td>
+                        <td>@(a.CheckOutTime?.ToString("HH:mm") ?? "—")</td>
+                        <td>@(a.PickedUpBy ?? "—")</td>
+                    </tr>
+                </ItemContent>
+                <Placeholder>
+                    <tr><td colspan="6" class="text-muted">Loading...</td></tr>
+                </Placeholder>
+                <EmptyContent>
+                    <tr><td colspan="6"><EmptyState Title="No records" Message="No attendance has been marked yet." IconName="calendar" /></td></tr>
+                </EmptyContent>
+            </Virtualize>
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private Virtualize<AttendanceDto>? virtualize;
+    private IReadOnlyList<GroupDto> groups = Array.Empty<GroupDto>();
+    private int? groupId;
+    private int totalCount;
+
+    private string ExportUrl => groupId is > 0 ? $"export/attendance.csv?groupId={groupId}" : "export/attendance.csv";
+
+    protected override async Task OnInitializedAsync()
+    {
+        groups = await GroupService.GetAllAsync();
+        await CountAsync();
+    }
+
+    // Called by Virtualize with "give me rows X to Y"
+    private async ValueTask<ItemsProviderResult<AttendanceDto>> LoadRowsAsync(ItemsProviderRequest request)
+    {
+        var page = await AttendanceService.GetHistoryAsync(groupId, request.StartIndex, request.Count, request.CancellationToken);
+        return new ItemsProviderResult<AttendanceDto>(page.Items, page.TotalCount);
+    }
+
+    private async Task CountAsync()
+    {
+        var first = await AttendanceService.GetHistoryAsync(groupId, 0, 1);
+        totalCount = first.TotalCount;
+    }
+
+    private async Task OnGroupChangedAsync(ChangeEventArgs e)
+    {
+        groupId = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await CountAsync();
+        if (virtualize is not null)
+        {
+            await virtualize.RefreshDataAsync();
+        }
+    }
+}
