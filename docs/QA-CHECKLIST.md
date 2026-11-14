@@ -62,7 +62,7 @@ Mark each case ✅ (pass) or ❌ (fail) and write the date. Fill the browser/dev
 | U5 | Chart | Hover/focus shows tooltip; "Table" shows the same data | ✅ table view |
 | U6 | CSV | Export opens in Excel with correct letters | ⬜ not tested yet |
 | U7 | Install (PWA) | Install icon in Chrome/Edge → app window | ⬜ not tested yet |
-| U8 | Offline page | Installed app, server stopped, reload → "You are offline" page | ⬜ not tested yet |
+| U8 | Offline page | Installed app, server stopped, reload → "You are offline" page | ✅ (logo fixed, see B9) |
 | U9 | Health | `/health` → Healthy; System status page shows cards | ✅ |
 
 ## 6. Cross-browser & cross-device matrix
@@ -91,4 +91,5 @@ Use real devices or the browser's device mode (F12 → Ctrl+Shift+M).
 | B6 | Risk (code review): group child counts could be stale after caching was added | Groups are cached | Cache invalidated on child/group changes (covered by a test) | ✅ Fixed |
 | B7 | Check-out button missing for a child | Child was already checked out (expected behavior) | No change; explained in User Guide | ✅ By design |
 | B8 | `appsettings.json` broken after manual edit | Missing brackets | Restored valid JSON | ✅ Fixed |
+| B9 | Offline page showed a broken logo image | Service worker cached the logo but only answered page requests | Service worker also serves its cached files when offline (cache v2) | ✅ Fixed |
 | | | | | |
