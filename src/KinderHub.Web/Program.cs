@@ -76,3 +76,5 @@ app.MapAdditionalIdentityEndpoints();
 
 KinderHub.Web.WebEndpoints.MapKinderHubEndpoints(app);
 app.Run();
+
+public partial class Program { }
