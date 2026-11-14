@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace KinderHub.Infrastructure.Services;
 
-public class AnnouncementService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogger<AnnouncementService> logger) : IAnnouncementService
+public class AnnouncementService(
+    IDbContextFactory<KinderHubDbContext> dbFactory,
+    IRealtimeNotifier notifier,
+    ILogger<AnnouncementService> logger) : IAnnouncementService
 {
     public async Task<IReadOnlyList<AnnouncementDto>> GetLatestAsync(IReadOnlyCollection<int>? groupIds = null, int take = 20, CancellationToken ct = default)
     {
@@ -53,14 +56,18 @@ public class AnnouncementService(IDbContextFactory<KinderHubDbContext> dbFactory
         try
         {
             await db.SaveChangesAsync(ct);
-            return Result<AnnouncementDto>.Success(new AnnouncementDto(announcement.Id, announcement.Title, announcement.Message,
-                announcement.IsImportant, announcement.AuthorName, announcement.GroupId, groupName, announcement.CreatedAt));
         }
         catch (DbUpdateException ex)
         {
             logger.LogError(ex, "Failed to create announcement");
             return Result<AnnouncementDto>.Failure("Could not publish the announcement. Please try again.");
         }
+
+        await notifier.PublishAsync(new AnnouncementEvent(announcement.Id, announcement.Title, announcement.GroupId,
+            announcement.IsImportant, IsNew: true));
+
+        return Result<AnnouncementDto>.Success(new AnnouncementDto(announcement.Id, announcement.Title, announcement.Message,
+            announcement.IsImportant, announcement.AuthorName, announcement.GroupId, groupName, announcement.CreatedAt));
     }
 
     public async Task<Result> UpdateAsync(AnnouncementEditModel model, CancellationToken ct = default)
@@ -77,13 +84,17 @@ public class AnnouncementService(IDbContextFactory<KinderHubDbContext> dbFactory
         try
         {
             await db.SaveChangesAsync(ct);
-            return Result.Success();
         }
         catch (DbUpdateException ex)
         {
             logger.LogError(ex, "Failed to update announcement {Id}", model.Id);
             return Result.Failure("Could not save the announcement. Please try again.");
         }
+
+        // Changed (not new): pages refresh, but nobody gets a "new announcement" pop-up
+        await notifier.PublishAsync(new AnnouncementEvent(announcement.Id, announcement.Title, announcement.GroupId,
+            announcement.IsImportant, IsNew: false));
+        return Result.Success();
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
@@ -94,6 +105,9 @@ public class AnnouncementService(IDbContextFactory<KinderHubDbContext> dbFactory
 
         db.Announcements.Remove(announcement);
         await db.SaveChangesAsync(ct);
+
+        await notifier.PublishAsync(new AnnouncementEvent(id, announcement.Title, announcement.GroupId,
+            announcement.IsImportant, IsNew: false));
         return Result.Success();
     }
 }

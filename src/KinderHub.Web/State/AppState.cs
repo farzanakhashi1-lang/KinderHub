@@ -11,6 +11,9 @@ public class AppState(ProtectedLocalStorage storage)
     public bool IsDarkMode { get; private set; }
     public bool IsLoaded { get; private set; }
 
+    // How many new announcements arrived live since the user last opened the Announcements page
+    public int UnreadAnnouncements { get; private set; }
+
     public event Action? OnChange;
 
     // Reads the saved theme from the browser (encrypted local storage)
@@ -42,6 +45,19 @@ public class AppState(ProtectedLocalStorage storage)
         {
             // Not critical: the theme still works for this session
         }
+    }
+
+    public void IncrementUnreadAnnouncements()
+    {
+        UnreadAnnouncements++;
+        NotifyStateChanged();
+    }
+
+    public void ClearUnreadAnnouncements()
+    {
+        if (UnreadAnnouncements == 0) return;
+        UnreadAnnouncements = 0;
+        NotifyStateChanged();
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();

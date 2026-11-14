@@ -1,0 +1,95 @@
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+@inject ToastService Toast
+@inject AppState AppState
+@inject ICurrentUserService CurrentUserService
+@inject IChildService ChildService
+@inject ILogger<LiveUpdates> Logger
+
+@* Connects to the SignalR hub and shows a "Live" indicator in the top bar *@
+@if (RendererInfo.IsInteractive && isAuthenticated)
+{
+    <span class="live-badge @(isConnected ? "on" : "off")" role="status"
+          title="@(isConnected ? "Live updates are on" : "Live updates are offline, reconnecting...")">
+        <span class="live-dot" aria-hidden="true"></span>@(isConnected ? "Live" : "Offline")
+    </span>
+}
+
+@code {
+    private HubConnection? hub;
+    private bool isConnected;
+    private bool isAuthenticated;
+    private bool isStaff;
+    private HashSet<int> parentGroupIds = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !RendererInfo.IsInteractive) return;
+
+        var user = await CurrentUserService.GetCurrentUserAsync();
+        if (!user.IsAuthenticated) return;
+
+        isAuthenticated = true;
+        isStaff = user.IsAdmin || user.IsTeacher;
+        if (user.IsParent)
+        {
+            var children = await ChildService.GetByParentEmailAsync(user.Email);
+            parentGroupIds = children.Select(c => c.GroupId).ToHashSet();
+        }
+
+        hub = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/notifications"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hub.On<AnnouncementEvent>(HubMethods.AnnouncementPublished, OnAnnouncementAsync);
+        hub.Reconnecting += _ => SetConnectedAsync(false);
+        hub.Reconnected += _ => SetConnectedAsync(true);
+        hub.Closed += _ => SetConnectedAsync(false);
+
+        try
+        {
+            await hub.StartAsync();
+            isConnected = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not connect to the notification hub");
+        }
+
+        StateHasChanged();
+    }
+
+    private Task OnAnnouncementAsync(AnnouncementEvent e)
+    {
+        // Parents only hear about general news and news for their children's groups
+        var isForMe = isStaff || e.GroupId is null || parentGroupIds.Contains(e.GroupId.Value);
+        if (!isForMe) return Task.CompletedTask;
+
+        return InvokeAsync(() =>
+        {
+            Toast.Show($"📢 New announcement: {e.Title}", e.IsImportant ? ToastLevel.Warning : ToastLevel.Info, 6000);
+
+            var onAnnouncementsPage = Navigation.ToBaseRelativePath(Navigation.Uri)
+                .StartsWith("announcements", StringComparison.OrdinalIgnoreCase);
+            if (!onAnnouncementsPage)
+            {
+                AppState.IncrementUnreadAnnouncements();
+            }
+        });
+    }
+
+    private Task SetConnectedAsync(bool connected)
+    {
+        isConnected = connected;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hub is not null)
+        {
+            await hub.DisposeAsync();
+        }
+    }
+}

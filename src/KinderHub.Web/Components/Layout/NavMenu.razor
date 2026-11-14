@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject NavigationManager NavigationManager
+@inject AppState AppState
 
 <div class="brand">
     <a href="" class="brand-link">
@@ -46,6 +47,10 @@
         <Authorized>
             <NavLink class="kh-nav-link" href="announcements">
                 <Icon Name="bell" /><span>Announcements</span>
+                @if (AppState.UnreadAnnouncements > 0)
+                {
+                    <span class="nav-count" aria-label="@($"{AppState.UnreadAnnouncements} new")">@AppState.UnreadAnnouncements</span>
+                }
             </NavLink>
 
             <div class="nav-heading">Account</div>
@@ -79,13 +84,20 @@
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+        AppState.OnChange += OnAppStateChanged;
     }
+
+    private void OnAppStateChanged() => InvokeAsync(StateHasChanged);
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        AppState.OnChange -= OnAppStateChanged;
+    }
 }

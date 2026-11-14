@@ -74,4 +74,5 @@ app.MapRazorComponents<App>()
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
+app.MapHub<KinderHub.Web.Realtime.NotificationHub>("/hubs/notifications");
 app.Run();

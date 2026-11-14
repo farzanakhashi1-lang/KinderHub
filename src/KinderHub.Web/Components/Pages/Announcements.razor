@@ -1,5 +1,8 @@
 @page "/announcements"
 @attribute [Authorize]
+@implements IDisposable
+@inject IRealtimeNotifier Notifier
+@inject AppState AppState
 @inject IAnnouncementService AnnouncementService
 @inject IGroupService GroupService
 @inject IChildService ChildService
@@ -99,7 +102,19 @@ else
         }
 
         await LoadAsync();
+        AppState.ClearUnreadAnnouncements();
+        Notifier.AnnouncementChanged += OnAnnouncementChanged;
     }
+
+    // Someone published, edited or deleted an announcement: refresh the list live
+    private void OnAnnouncementChanged(AnnouncementEvent e) => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        AppState.ClearUnreadAnnouncements();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Notifier.AnnouncementChanged -= OnAnnouncementChanged;
 
     private async Task LoadAsync()
     {

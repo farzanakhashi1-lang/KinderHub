@@ -1,6 +1,8 @@
 @page "/attendance"
 @using System.ComponentModel.DataAnnotations
 @attribute [Authorize(Roles = "Admin,Teacher")]
+@implements IDisposable
+@inject IRealtimeNotifier Notifier
 @inject IGroupService GroupService
 @inject IAttendanceService AttendanceService
 @inject ToastService Toast
@@ -94,7 +96,25 @@
         groups = await GroupService.GetAllAsync();
         selectedGroupId = groups.FirstOrDefault()?.Id ?? 0;
         await LoadAsync();
+        Notifier.AttendanceChanged += OnAttendanceChanged;
     }
+
+    // Another teacher changed attendance: update the row on this screen too
+    private void OnAttendanceChanged(AttendanceChangedEvent e)
+    {
+        if (e.GroupId != selectedGroupId || e.Date != selectedDate) return;
+        _ = InvokeAsync(() =>
+        {
+            var row = rows?.FirstOrDefault(r => r.ChildId == e.ChildId);
+            if (row is null) return;
+            row.Status = e.Status;
+            row.CheckInTime = e.CheckInTime;
+            row.CheckOutTime = e.CheckOutTime;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() => Notifier.AttendanceChanged -= OnAttendanceChanged;
 
     private async Task LoadAsync()
     {

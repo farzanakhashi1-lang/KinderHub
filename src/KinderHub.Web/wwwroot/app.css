@@ -1352,3 +1352,72 @@ a {
         width: 100%;
     }
 }
+
+/* ---------- 13. Live updates (Steps 8-9) ---------- */
+.live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .3rem .7rem;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 800;
+    border: 1px solid var(--kh-border);
+    background: var(--kh-surface);
+    color: var(--kh-muted);
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--kh-muted);
+}
+
+.live-badge.on {
+    color: var(--kh-success);
+    background: var(--kh-success-soft);
+    border-color: transparent;
+}
+
+.live-badge.on .live-dot {
+    background: var(--kh-success);
+    animation: kh-pulse 1.8s ease-in-out infinite;
+}
+
+.live-badge.off {
+    color: var(--kh-warning);
+    background: var(--kh-warning-soft);
+    border-color: transparent;
+}
+
+.live-badge.off .live-dot {
+    background: var(--kh-warning);
+}
+
+@keyframes kh-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kh-success) 60%, transparent); }
+    50% { box-shadow: 0 0 0 5px transparent; }
+}
+
+.nav-count {
+    margin-left: auto;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--kh-accent);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 800;
+    display: inline-grid;
+    place-items: center;
+}
+
+@media (max-width: 575.98px) {
+    .live-badge {
+        padding: .3rem .5rem;
+        font-size: 0;
+        gap: 0;
+    }
+}

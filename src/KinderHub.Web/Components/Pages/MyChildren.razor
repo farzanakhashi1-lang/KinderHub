@@ -1,5 +1,7 @@
 @page "/my-children"
 @attribute [Authorize(Roles = "Parent")]
+@implements IDisposable
+@inject IRealtimeNotifier Notifier
 @inject IChildService ChildService
 @inject IAttendanceService AttendanceService
 @inject IDailyReportService ReportService
@@ -126,11 +128,66 @@ else
                 reports[child.Id] = await ReportService.GetForChildAsync(child.Id, 5);
             }
             children = list;
+
+            // Live updates: listen for changes about MY children only
+            Notifier.AttendanceChanged += OnAttendanceChanged;
+            Notifier.ReportSaved += OnReportSaved;
         }
         catch (Exception)
         {
             children = Array.Empty<ChildDto>();
             Toast.ShowError("Could not load your children's information.");
         }
+    }
+
+    private bool IsMyChild(int childId) => children?.Any(c => c.Id == childId) == true;
+
+    private void OnAttendanceChanged(AttendanceChangedEvent e)
+    {
+        if (!IsMyChild(e.ChildId)) return;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                histories[e.ChildId] = await AttendanceService.GetChildHistoryAsync(e.ChildId, today.AddDays(-13), today);
+                if (e.Date == today) Toast.ShowInfo(Describe(e));
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                // the page keeps the old data; the next refresh will fix it
+            }
+        });
+    }
+
+    private void OnReportSaved(ReportSavedEvent e)
+    {
+        if (!IsMyChild(e.ChildId)) return;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                reports[e.ChildId] = await ReportService.GetForChildAsync(e.ChildId, 5);
+                Toast.ShowInfo($"📝 New daily report for {e.ChildName}");
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                // keep old data
+            }
+        });
+    }
+
+    private static string Describe(AttendanceChangedEvent e)
+    {
+        if (e.CheckOutTime is { } outTime) return $"👋 {e.ChildName} was picked up at {outTime:HH:mm}";
+        if (DisplayHelpers.CameIn(e.Status) && e.CheckInTime is { } inTime) return $"✅ {e.ChildName} arrived at {inTime:HH:mm}";
+        return $"ℹ️ {e.ChildName} was marked as {e.Status}";
+    }
+
+    public void Dispose()
+    {
+        Notifier.AttendanceChanged -= OnAttendanceChanged;
+        Notifier.ReportSaved -= OnReportSaved;
     }
 }

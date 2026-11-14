@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace KinderHub.Infrastructure.Services;
 
-public class AttendanceService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogger<AttendanceService> logger) : IAttendanceService
+public class AttendanceService(
+    IDbContextFactory<KinderHubDbContext> dbFactory,
+    IRealtimeNotifier notifier,
+    ILogger<AttendanceService> logger) : IAttendanceService
 {
     public async Task<IReadOnlyList<AttendanceRowDto>> GetDailySheetAsync(int groupId, DateOnly date, CancellationToken ct = default)
     {
@@ -59,8 +62,11 @@ public class AttendanceService(IDbContextFactory<KinderHubDbContext> dbFactory, 
         if (model.Date is null || model.Status is null) return Result.Failure("Date and status are required.");
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        if (!await db.Children.AnyAsync(c => c.Id == model.ChildId, ct))
-            return Result.Failure("Child not found.");
+        var child = await db.Children.AsNoTracking()
+            .Where(c => c.Id == model.ChildId)
+            .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
+            .FirstOrDefaultAsync(ct);
+        if (child is null) return Result.Failure("Child not found.");
 
         var date = model.Date.Value;
         var record = await db.AttendanceRecords.FirstOrDefaultAsync(a => a.ChildId == model.ChildId && a.Date == date, ct);
@@ -79,12 +85,17 @@ public class AttendanceService(IDbContextFactory<KinderHubDbContext> dbFactory, 
         try
         {
             await db.SaveChangesAsync(ct);
-            return Result.Success();
         }
         catch (DbUpdateException ex)
         {
             logger.LogError(ex, "Failed to save attendance for child {ChildId} on {Date}", model.ChildId, date);
             return Result.Failure("Could not save attendance. Please refresh and try again.");
         }
+
+        // Tell everyone who is online (parents, other teachers, dashboards)
+        await notifier.PublishAsync(new AttendanceChangedEvent(model.ChildId, child.GroupId, child.Name, date,
+            record.Status, record.CheckInTime, record.CheckOutTime));
+
+        return Result.Success();
     }
 }

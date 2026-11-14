@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace KinderHub.Infrastructure.Services;
 
-public class DailyReportService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogger<DailyReportService> logger) : IDailyReportService
+public class DailyReportService(
+    IDbContextFactory<KinderHubDbContext> dbFactory,
+    IRealtimeNotifier notifier,
+    ILogger<DailyReportService> logger) : IDailyReportService
 {
     public async Task<IReadOnlyList<DailyReportDto>> GetForChildAsync(int childId, int take = 10, CancellationToken ct = default)
     {
@@ -39,8 +42,11 @@ public class DailyReportService(IDbContextFactory<KinderHubDbContext> dbFactory,
         if (model.Date is null) return Result.Failure("Date is required.");
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        if (!await db.Children.AnyAsync(c => c.Id == model.ChildId, ct))
-            return Result.Failure("Child not found.");
+        var child = await db.Children.AsNoTracking()
+            .Where(c => c.Id == model.ChildId)
+            .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
+            .FirstOrDefaultAsync(ct);
+        if (child is null) return Result.Failure("Child not found.");
 
         var date = model.Date.Value;
         var report = await db.DailyReports.FirstOrDefaultAsync(r => r.ChildId == model.ChildId && r.Date == date, ct);
@@ -60,13 +66,15 @@ public class DailyReportService(IDbContextFactory<KinderHubDbContext> dbFactory,
         try
         {
             await db.SaveChangesAsync(ct);
-            return Result.Success();
         }
         catch (DbUpdateException ex)
         {
             logger.LogError(ex, "Failed to save daily report for child {ChildId}", model.ChildId);
             return Result.Failure("Could not save the report. Please try again.");
         }
+
+        await notifier.PublishAsync(new ReportSavedEvent(model.ChildId, child.GroupId, child.Name, date));
+        return Result.Success();
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)

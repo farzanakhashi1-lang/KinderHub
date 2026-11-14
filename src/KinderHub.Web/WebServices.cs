@@ -1,4 +1,5 @@
 using KinderHub.Application.Interfaces;
+using KinderHub.Web.Realtime;
 using KinderHub.Web.Services;
 using KinderHub.Web.State;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
@@ -15,6 +16,11 @@ public static class WebServices
         services.AddScoped<AppState>();
         services.AddScoped<ToastService>();
         services.TryAddScoped<ProtectedLocalStorage>();
+
+        // Real-time: SignalR + one shared notifier for the whole app
+        services.AddSignalR();
+        services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
+
         return services;
     }
 }

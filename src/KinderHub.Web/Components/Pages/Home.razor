@@ -1,5 +1,7 @@
 @page "/"
+@implements IDisposable
 @inject IDashboardService DashboardService
+@inject IRealtimeNotifier Notifier
 @inject ICurrentUserService CurrentUserService
 
 <PageTitle>KinderHub</PageTitle>
@@ -126,6 +128,43 @@
         if (user.IsAdmin || user.IsTeacher)
         {
             stats = await DashboardService.GetStatsAsync();
+            Notifier.AttendanceChanged += OnAttendanceChanged; // live dashboard
         }
     }
+
+    private bool isReloading;
+    private bool reloadPending;
+
+    private void OnAttendanceChanged(AttendanceChangedEvent e) => _ = InvokeAsync(ReloadStatsAsync);
+
+    // Many changes at once (e.g. "mark all present") cause only a few reloads, not one per child
+    private async Task ReloadStatsAsync()
+    {
+        if (isReloading)
+        {
+            reloadPending = true;
+            return;
+        }
+
+        isReloading = true;
+        try
+        {
+            do
+            {
+                reloadPending = false;
+                stats = await DashboardService.GetStatsAsync();
+            } while (reloadPending);
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // keep the old numbers if reloading fails
+        }
+        finally
+        {
+            isReloading = false;
+        }
+    }
+
+    public void Dispose() => Notifier.AttendanceChanged -= OnAttendanceChanged;
 }
