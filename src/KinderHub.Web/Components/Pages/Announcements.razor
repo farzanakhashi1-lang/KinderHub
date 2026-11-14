@@ -1,0 +1,181 @@
+@page "/announcements"
+@attribute [Authorize]
+@inject IAnnouncementService AnnouncementService
+@inject IGroupService GroupService
+@inject IChildService ChildService
+@inject ICurrentUserService CurrentUserService
+@inject ToastService Toast
+
+<PageTitle>Announcements · KinderHub</PageTitle>
+
+<PageHeader Title="Announcements" Subtitle="News from the kindergarten">
+    <Actions>
+        @if (canWrite)
+        {
+            <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+                <Icon Name="plus" Size="18" /> New announcement
+            </button>
+        }
+    </Actions>
+</PageHeader>
+
+@if (announcements is null)
+{
+    <LoadingSpinner Text="Loading announcements..." />
+}
+else if (announcements.Count == 0)
+{
+    <EmptyState Title="No announcements yet" Message="When the kindergarten posts news, it will appear here." IconName="bell" />
+}
+else
+{
+    <div class="announcement-list">
+        @foreach (var a in announcements)
+        {
+            <article class="kh-card announcement @(a.IsImportant ? "important" : "")" @key="a.Id">
+                <div class="announcement-head">
+                    <div class="announcement-badges">
+                        @if (a.IsImportant)
+                        {
+                            <Badge Text="Important" Color="danger" />
+                        }
+                        <Badge Text="@(a.GroupName is null ? "Everyone" : $"Group: {a.GroupName}")" Color="@(a.GroupName is null ? "primary" : "accent")" />
+                    </div>
+                    @if (canWrite)
+                    {
+                        <div class="row-actions">
+                            <button type="button" class="icon-btn" title="Edit" aria-label="@($"Edit {a.Title}")" @onclick="() => OpenEdit(a)">
+                                <Icon Name="edit" Size="16" />
+                            </button>
+                            <button type="button" class="icon-btn danger" title="Delete" aria-label="@($"Delete {a.Title}")" @onclick="() => deleteTarget = a">
+                                <Icon Name="trash" Size="16" />
+                            </button>
+                        </div>
+                    }
+                </div>
+                <h2 class="announcement-title">@a.Title</h2>
+                <p class="announcement-message">@a.Message</p>
+                <div class="announcement-meta">@a.AuthorName &middot; @DisplayHelpers.LocalTime(a.CreatedAt)</div>
+            </article>
+        }
+    </div>
+}
+
+<Modal IsOpen="isFormOpen" Title="@(editModel.Id == 0 ? "New announcement" : "Edit announcement")" OnClose="CloseForm">
+    <AnnouncementForm Model="editModel" Groups="groups" IsBusy="isSaving" OnValidSubmit="SaveAsync" OnCancel="CloseForm" />
+</Modal>
+
+<ConfirmDialog IsOpen="deleteTarget is not null" Title="Delete announcement?"
+               Message="@($"\"{deleteTarget?.Title}\" will be removed for everyone.")"
+               ConfirmText="Delete" IsBusy="isDeleting" OnConfirm="DeleteAsync" OnCancel="() => deleteTarget = null" />
+
+@code {
+    private IReadOnlyList<AnnouncementDto>? announcements;
+    private IReadOnlyList<GroupDto> groups = Array.Empty<GroupDto>();
+    private IReadOnlyCollection<int>? parentGroupIds;
+    private CurrentUserInfo user = CurrentUserInfo.Anonymous;
+    private bool canWrite;
+
+    private AnnouncementEditModel editModel = new();
+    private AnnouncementDto? deleteTarget;
+    private bool isFormOpen;
+    private bool isSaving;
+    private bool isDeleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await CurrentUserService.GetCurrentUserAsync();
+        canWrite = user.IsAdmin || user.IsTeacher;
+
+        if (canWrite)
+        {
+            groups = await GroupService.GetAllAsync();
+        }
+        else
+        {
+            // Parents only see general news + news for their children's groups
+            var myChildren = await ChildService.GetByParentEmailAsync(user.Email);
+            parentGroupIds = myChildren.Select(c => c.GroupId).Distinct().ToList();
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            announcements = await AnnouncementService.GetLatestAsync(canWrite ? null : parentGroupIds, 50);
+        }
+        catch (Exception)
+        {
+            announcements = Array.Empty<AnnouncementDto>();
+            Toast.ShowError("Could not load announcements.");
+        }
+    }
+
+    private void OpenCreate()
+    {
+        editModel = new AnnouncementEditModel();
+        isFormOpen = true;
+    }
+
+    private void OpenEdit(AnnouncementDto announcement)
+    {
+        editModel = AnnouncementEditModel.FromDto(announcement);
+        isFormOpen = true;
+    }
+
+    private void CloseForm() => isFormOpen = false;
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            var isNew = editModel.Id == 0;
+            Result result = isNew
+                ? await AnnouncementService.CreateAsync(editModel, user.DisplayName)
+                : await AnnouncementService.UpdateAsync(editModel);
+
+            if (result.Succeeded)
+            {
+                Toast.ShowSuccess(isNew ? "Announcement published." : "Announcement updated.");
+                isFormOpen = false;
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(result.Error ?? "Something went wrong.");
+            }
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleteTarget is null) return;
+        isDeleting = true;
+        try
+        {
+            var result = await AnnouncementService.DeleteAsync(deleteTarget.Id);
+            if (result.Succeeded)
+            {
+                Toast.ShowSuccess("Announcement deleted.");
+                deleteTarget = null;
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(result.Error ?? "Could not delete.");
+            }
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

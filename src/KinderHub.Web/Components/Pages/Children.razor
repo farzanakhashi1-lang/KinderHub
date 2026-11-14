@@ -1,53 +1,209 @@
 @page "/children"
-@using Microsoft.AspNetCore.Authorization
-@using KinderHub.Application.Common
-@using KinderHub.Application.DTOs
-@using KinderHub.Application.Interfaces
 @attribute [Authorize(Roles = "Admin,Teacher")]
 @inject IChildService ChildService
+@inject IGroupService GroupService
+@inject ICurrentUserService CurrentUserService
+@inject ToastService Toast
 
-<PageTitle>Children</PageTitle>
+<PageTitle>Children · KinderHub</PageTitle>
 
-<h1>Children</h1>
-<p class="text-muted">Only Admin and Teacher can open this page.</p>
+<PageHeader Title="Children" Subtitle="All children in the kindergarten">
+    <Actions>
+        @if (isAdmin)
+        {
+            <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+                <Icon Name="plus" Size="18" /> Add child
+            </button>
+        }
+    </Actions>
+</PageHeader>
 
-@if (result is null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <p>Total: <strong>@result.TotalCount</strong> children</p>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Age</th>
-                <th>Group</th>
-                <th>Parent</th>
-                <th>Phone</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var c in result.Items)
+<div class="kh-toolbar">
+    <SearchBox Value="@query.Search" ValueChanged="OnSearchChangedAsync" Placeholder="Search by child or parent name..." />
+    <select class="form-select kh-filter" aria-label="Filter by group" @onchange="OnGroupFilterChangedAsync">
+        <option value="">All groups</option>
+        @foreach (var g in groups)
+        {
+            <option value="@g.Id" selected="@(query.GroupId == g.Id)">@g.Name</option>
+        }
+    </select>
+</div>
+
+<DataTable TItem="ChildDto" Items="result?.Items" IsLoading="isLoading" KeySelector="c => c.Id"
+           EmptyTitle="No children found" EmptyMessage="Try another search or group.">
+    <Header>
+        <th>Child</th>
+        <th>Age</th>
+        <th>Group</th>
+        <th>Parent</th>
+        <th>Phone</th>
+        <th class="text-end">Actions</th>
+    </Header>
+    <Row Context="c">
+        <td>
+            <div class="cell-main">@c.FullName</div>
+            @if (!string.IsNullOrWhiteSpace(c.Notes))
             {
-                <tr @key="c.Id">
-                    <td>@c.FullName</td>
-                    <td>@c.Age</td>
-                    <td>@c.GroupName</td>
-                    <td>@c.ParentName</td>
-                    <td>@c.ParentPhone</td>
-                </tr>
+                <div class="cell-sub">@c.Notes</div>
             }
-        </tbody>
-    </table>
+        </td>
+        <td>@c.Age</td>
+        <td><Badge Text="@c.GroupName" Color="primary" /></td>
+        <td>
+            <div class="cell-main">@c.ParentName</div>
+            <div class="cell-sub">@c.ParentEmail</div>
+        </td>
+        <td>@c.ParentPhone</td>
+        <td class="text-end">
+            <div class="row-actions">
+                <button type="button" class="icon-btn" title="Edit" aria-label="@($"Edit {c.FullName}")" @onclick="() => OpenEdit(c)">
+                    <Icon Name="edit" Size="16" />
+                </button>
+                @if (isAdmin)
+                {
+                    <button type="button" class="icon-btn danger" title="Delete" aria-label="@($"Delete {c.FullName}")" @onclick="() => deleteTarget = c">
+                        <Icon Name="trash" Size="16" />
+                    </button>
+                }
+            </div>
+        </td>
+    </Row>
+</DataTable>
+
+@if (result is not null)
+{
+    <Pager Page="query.Page" PageChanged="OnPageChangedAsync" TotalPages="result.TotalPages" TotalCount="result.TotalCount" />
 }
+
+<Modal IsOpen="isFormOpen" Title="@(editModel.Id == 0 ? "Add child" : "Edit child")" Size="lg" OnClose="CloseForm">
+    <ChildForm Model="editModel" Groups="groups" IsBusy="isSaving" OnValidSubmit="SaveAsync" OnCancel="CloseForm" />
+</Modal>
+
+<ConfirmDialog IsOpen="deleteTarget is not null" Title="Delete child?"
+               Message="@($"{deleteTarget?.FullName} and all their attendance and reports will be deleted. This cannot be undone.")"
+               ConfirmText="Delete" IsBusy="isDeleting" OnConfirm="DeleteAsync" OnCancel="() => deleteTarget = null" />
 
 @code {
+    private readonly ChildQuery query = new() { PageSize = 10 };
     private PagedResult<ChildDto>? result;
+    private IReadOnlyList<GroupDto> groups = Array.Empty<GroupDto>();
+    private bool isLoading = true;
+    private bool isAdmin;
+    private bool isFormOpen;
+    private bool isSaving;
+    private bool isDeleting;
+    private ChildEditModel editModel = new();
+    private ChildDto? deleteTarget;
 
     protected override async Task OnInitializedAsync()
     {
-        result = await ChildService.GetPagedAsync(new ChildQuery { PageSize = 50 });
+        var user = await CurrentUserService.GetCurrentUserAsync();
+        isAdmin = user.IsAdmin;
+        groups = await GroupService.GetAllAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            result = await ChildService.GetPagedAsync(query);
+        }
+        catch (Exception)
+        {
+            Toast.ShowError("Could not load the children. Please refresh the page.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSearchChangedAsync(string? text)
+    {
+        query.Search = text;
+        query.Page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnGroupFilterChangedAsync(ChangeEventArgs e)
+    {
+        query.GroupId = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        query.Page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnPageChangedAsync(int page)
+    {
+        query.Page = page;
+        await LoadAsync();
+    }
+
+    private void OpenCreate()
+    {
+        editModel = new ChildEditModel();
+        isFormOpen = true;
+    }
+
+    private void OpenEdit(ChildDto child)
+    {
+        editModel = ChildEditModel.FromDto(child);
+        isFormOpen = true;
+    }
+
+    private void CloseForm() => isFormOpen = false;
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            var isNew = editModel.Id == 0;
+            Result saveResult = isNew
+                ? await ChildService.CreateAsync(editModel)
+                : await ChildService.UpdateAsync(editModel);
+
+            if (saveResult.Succeeded)
+            {
+                Toast.ShowSuccess(isNew ? "Child added." : "Changes saved.");
+                isFormOpen = false;
+                groups = await GroupService.GetAllAsync();
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(saveResult.Error ?? "Something went wrong.");
+            }
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleteTarget is null) return;
+        isDeleting = true;
+        try
+        {
+            var deleteResult = await ChildService.DeleteAsync(deleteTarget.Id);
+            if (deleteResult.Succeeded)
+            {
+                Toast.ShowSuccess($"{deleteTarget.FullName} was deleted.");
+                deleteTarget = null;
+                groups = await GroupService.GetAllAsync();
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(deleteResult.Error ?? "Could not delete.");
+            }
+        }
+        finally
+        {
+            isDeleting = false;
+        }
     }
 }

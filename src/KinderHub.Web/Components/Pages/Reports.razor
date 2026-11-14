@@ -1,0 +1,162 @@
+@page "/reports"
+@attribute [Authorize(Roles = "Admin,Teacher")]
+@inject IGroupService GroupService
+@inject IChildService ChildService
+@inject IDailyReportService ReportService
+@inject ICurrentUserService CurrentUserService
+@inject ToastService Toast
+
+<PageTitle>Daily reports · KinderHub</PageTitle>
+
+<PageHeader Title="Daily reports" Subtitle="Meals, nap, mood and activities for each child" />
+
+<div class="kh-toolbar">
+    <select class="form-select kh-filter" aria-label="Group" @onchange="OnGroupChangedAsync">
+        @foreach (var g in groups)
+        {
+            <option value="@g.Id" selected="@(g.Id == selectedGroupId)">@g.Name</option>
+        }
+    </select>
+    <input type="date" class="form-control kh-filter" aria-label="Date"
+           value="@selectedDate.ToString("yyyy-MM-dd")" max="@today.ToString("yyyy-MM-dd")" @onchange="OnDateChangedAsync" />
+</div>
+
+@if (children is not null && children.Count > 0)
+{
+    <div class="summary-chips">
+        <span class="summary-chip success">Written: @reports.Count</span>
+        <span class="summary-chip">Missing: @(children.Count - reports.Count)</span>
+    </div>
+}
+
+<DataTable TItem="ChildDto" Items="children" IsLoading="children is null" KeySelector="c => c.Id"
+           EmptyTitle="No children in this group" EmptyMessage="Add children to the group first.">
+    <Header>
+        <th>Child</th>
+        <th>Mood</th>
+        <th>Meals</th>
+        <th>Nap</th>
+        <th class="text-end">Report</th>
+    </Header>
+    <Row Context="c">
+        @{ reports.TryGetValue(c.Id, out var report); }
+        <td class="cell-main">@c.FullName</td>
+        <td>
+            @if (report is not null)
+            {
+                <span title="@report.Mood"><span aria-hidden="true">@DisplayHelpers.MoodEmoji(report.Mood)</span> @report.Mood</span>
+            }
+            else
+            {
+                <span class="text-muted">—</span>
+            }
+        </td>
+        <td class="cell-sub">@(report?.Meals ?? "—")</td>
+        <td>@(report is null ? "—" : $"{report.NapMinutes} min")</td>
+        <td class="text-end">
+            <button type="button" class="btn btn-sm @(report is null ? "btn-primary" : "btn-light")" @onclick="() => OpenForm(c, report)">
+                <Icon Name="@(report is null ? "plus" : "edit")" Size="16" /> @(report is null ? "Write" : "Edit")
+            </button>
+        </td>
+    </Row>
+</DataTable>
+
+<Modal IsOpen="isFormOpen" Title="@($"Daily report: {selectedChildName}")" Size="lg" OnClose="CloseForm">
+    <DailyReportForm Model="editModel" IsBusy="isSaving" OnValidSubmit="SaveAsync" OnCancel="CloseForm" />
+</Modal>
+
+@code {
+    private readonly DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+    private IReadOnlyList<GroupDto> groups = Array.Empty<GroupDto>();
+    private IReadOnlyList<ChildDto>? children;
+    private Dictionary<int, DailyReportDto> reports = new();
+    private int selectedGroupId;
+    private DateOnly selectedDate;
+    private string authorName = string.Empty;
+
+    private DailyReportEditModel editModel = new();
+    private string selectedChildName = string.Empty;
+    private bool isFormOpen;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedDate = today;
+        var user = await CurrentUserService.GetCurrentUserAsync();
+        authorName = user.DisplayName;
+        groups = await GroupService.GetAllAsync();
+        selectedGroupId = groups.FirstOrDefault()?.Id ?? 0;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        children = null;
+        if (selectedGroupId == 0)
+        {
+            children = Array.Empty<ChildDto>();
+            reports = new();
+            return;
+        }
+        try
+        {
+            var list = await ReportService.GetForGroupAndDateAsync(selectedGroupId, selectedDate);
+            reports = list.ToDictionary(r => r.ChildId);
+            children = await ChildService.GetByGroupAsync(selectedGroupId);
+        }
+        catch (Exception)
+        {
+            children = Array.Empty<ChildDto>();
+            Toast.ShowError("Could not load reports.");
+        }
+    }
+
+    private async Task OnGroupChangedAsync(ChangeEventArgs e)
+    {
+        selectedGroupId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        await LoadAsync();
+    }
+
+    private async Task OnDateChangedAsync(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var date) && date <= today)
+        {
+            selectedDate = date;
+            await LoadAsync();
+        }
+    }
+
+    private void OpenForm(ChildDto child, DailyReportDto? existing)
+    {
+        selectedChildName = child.FullName;
+        editModel = existing is null
+            ? new DailyReportEditModel { ChildId = child.Id, Date = selectedDate }
+            : DailyReportEditModel.FromDto(existing);
+        isFormOpen = true;
+    }
+
+    private void CloseForm() => isFormOpen = false;
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            var result = await ReportService.SaveAsync(editModel, authorName);
+            if (result.Succeeded)
+            {
+                Toast.ShowSuccess($"Report for {selectedChildName} saved.");
+                isFormOpen = false;
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(result.Error ?? "Could not save the report.");
+            }
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

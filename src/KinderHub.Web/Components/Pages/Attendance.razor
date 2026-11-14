@@ -1,0 +1,227 @@
+@page "/attendance"
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize(Roles = "Admin,Teacher")]
+@inject IGroupService GroupService
+@inject IAttendanceService AttendanceService
+@inject ToastService Toast
+
+<PageTitle>Attendance · KinderHub</PageTitle>
+
+<PageHeader Title="Attendance" Subtitle="Mark who came, and when they were picked up">
+    <Actions>
+        <button type="button" class="btn btn-outline-primary" @onclick="MarkAllPresentAsync"
+                disabled="@(rows is null || rows.Count == 0 || isBusy)">
+            <Icon Name="check" Size="18" /> Mark everyone not marked as present
+        </button>
+    </Actions>
+</PageHeader>
+
+<div class="kh-toolbar">
+    <select class="form-select kh-filter" aria-label="Group" @onchange="OnGroupChangedAsync">
+        @foreach (var g in groups)
+        {
+            <option value="@g.Id" selected="@(g.Id == selectedGroupId)">@g.Name</option>
+        }
+    </select>
+    <input type="date" class="form-control kh-filter" aria-label="Date"
+           value="@selectedDate.ToString("yyyy-MM-dd")" max="@today.ToString("yyyy-MM-dd")" @onchange="OnDateChangedAsync" />
+</div>
+
+@if (rows is not null && rows.Count > 0)
+{
+    <div class="summary-chips" aria-label="Summary">
+        <span class="summary-chip success">Present: @rows.Count(r => r.Status == AttendanceStatus.Present)</span>
+        <span class="summary-chip warning">Late: @rows.Count(r => r.Status == AttendanceStatus.Late)</span>
+        <span class="summary-chip danger">Absent: @rows.Count(r => r.Status == AttendanceStatus.Absent)</span>
+        <span class="summary-chip accent">Sick: @rows.Count(r => r.Status == AttendanceStatus.Sick)</span>
+        <span class="summary-chip">Not marked: @rows.Count(r => r.Status is null)</span>
+    </div>
+}
+
+<DataTable TItem="AttendanceRowDto" Items="rows" IsLoading="rows is null" KeySelector="r => r.ChildId"
+           EmptyTitle="No children in this group" EmptyMessage="Add children to the group first.">
+    <Header>
+        <th>Child</th>
+        <th>Status</th>
+        <th>Check-in</th>
+        <th>Check-out</th>
+        <th class="text-end">Pick-up</th>
+    </Header>
+    <Row Context="r">
+        <td class="cell-main">@r.ChildName</td>
+        <td>
+            <div class="status-group" role="group" aria-label="@($"Status for {r.ChildName}")">
+                @foreach (var s in statuses)
+                {
+                    <button type="button" class="status-btn @(r.Status == s ? "active " + s.ToString().ToLower() : "")"
+                            aria-pressed="@(r.Status == s ? "true" : "false")" disabled="@isBusy"
+                            @onclick="() => SetStatusAsync(r, s)">@s</button>
+                }
+            </div>
+        </td>
+        <td>@(r.CheckInTime?.ToString("HH:mm") ?? "—")</td>
+        <td>@(r.CheckOutTime?.ToString("HH:mm") ?? "—")</td>
+        <td class="text-end">
+            @if (DisplayHelpers.CameIn(r.Status) && r.CheckOutTime is null)
+            {
+                <button type="button" class="btn btn-sm btn-light" disabled="@isBusy" @onclick="() => CheckOutAsync(r)">
+                    <Icon Name="log-out" Size="16" /> Check out
+                </button>
+            }
+            else if (r.CheckOutTime is not null)
+            {
+                <span class="text-muted small">Picked up</span>
+            }
+        </td>
+    </Row>
+</DataTable>
+
+@code {
+    private static readonly AttendanceStatus[] statuses = Enum.GetValues<AttendanceStatus>();
+    private readonly DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+
+    private IReadOnlyList<GroupDto> groups = Array.Empty<GroupDto>();
+    private IReadOnlyList<AttendanceRowDto>? rows;
+    private int selectedGroupId;
+    private DateOnly selectedDate;
+    private bool isBusy;
+
+    private bool IsToday => selectedDate == today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedDate = today;
+        groups = await GroupService.GetAllAsync();
+        selectedGroupId = groups.FirstOrDefault()?.Id ?? 0;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        rows = null;
+        if (selectedGroupId == 0)
+        {
+            rows = Array.Empty<AttendanceRowDto>();
+            return;
+        }
+        try
+        {
+            rows = await AttendanceService.GetDailySheetAsync(selectedGroupId, selectedDate);
+        }
+        catch (Exception)
+        {
+            rows = Array.Empty<AttendanceRowDto>();
+            Toast.ShowError("Could not load attendance.");
+        }
+    }
+
+    private async Task OnGroupChangedAsync(ChangeEventArgs e)
+    {
+        selectedGroupId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        await LoadAsync();
+    }
+
+    private async Task OnDateChangedAsync(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var date))
+        {
+            if (date > today)
+            {
+                Toast.ShowWarning("You cannot mark attendance for a future date.");
+                return;
+            }
+            selectedDate = date;
+            await LoadAsync();
+        }
+    }
+
+    private async Task SetStatusAsync(AttendanceRowDto row, AttendanceStatus status)
+    {
+        var cameIn = DisplayHelpers.CameIn(status);
+        var defaultCheckIn = IsToday ? DisplayHelpers.NowTime()
+                           : status == AttendanceStatus.Late ? new TimeOnly(9, 15) : new TimeOnly(8, 30);
+
+        var model = new AttendanceEditModel
+        {
+            ChildId = row.ChildId,
+            Date = selectedDate,
+            Status = status,
+            CheckInTime = cameIn ? row.CheckInTime ?? defaultCheckIn : null,
+            CheckOutTime = cameIn ? row.CheckOutTime : null,
+            PickedUpBy = cameIn ? row.PickedUpBy : null,
+            Note = row.Note
+        };
+
+        if (await SaveAsync(model))
+        {
+            row.Status = model.Status;
+            row.CheckInTime = model.CheckInTime;
+            row.CheckOutTime = model.CheckOutTime;
+            row.PickedUpBy = model.PickedUpBy;
+        }
+    }
+
+    private async Task CheckOutAsync(AttendanceRowDto row)
+    {
+        var checkOut = IsToday ? DisplayHelpers.NowTime() : new TimeOnly(17, 30);
+        if (row.CheckInTime is { } checkIn && checkOut <= checkIn)
+            checkOut = checkIn.AddMinutes(1);
+
+        var model = new AttendanceEditModel
+        {
+            ChildId = row.ChildId,
+            Date = selectedDate,
+            Status = row.Status,
+            CheckInTime = row.CheckInTime,
+            CheckOutTime = checkOut,
+            PickedUpBy = row.PickedUpBy ?? "Parent",
+            Note = row.Note
+        };
+
+        if (await SaveAsync(model))
+        {
+            row.CheckOutTime = model.CheckOutTime;
+            row.PickedUpBy = model.PickedUpBy;
+            Toast.ShowSuccess($"{row.ChildName} was checked out.");
+        }
+    }
+
+    private async Task MarkAllPresentAsync()
+    {
+        if (rows is null) return;
+        var count = 0;
+        foreach (var row in rows.Where(r => r.Status is null).ToList())
+        {
+            await SetStatusAsync(row, AttendanceStatus.Present);
+            count++;
+        }
+        Toast.ShowSuccess(count == 0 ? "Everyone is already marked." : $"{count} children marked as present.");
+    }
+
+    // Validates the rules from AttendanceEditModel, then saves
+    private async Task<bool> SaveAsync(AttendanceEditModel model)
+    {
+        var errors = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(model, new ValidationContext(model), errors, validateAllProperties: true))
+        {
+            Toast.ShowError(errors.First().ErrorMessage ?? "Invalid data.");
+            return false;
+        }
+
+        isBusy = true;
+        try
+        {
+            var result = await AttendanceService.SaveAsync(model);
+            if (!result.Succeeded)
+            {
+                Toast.ShowError(result.Error ?? "Could not save.");
+                return false;
+            }
+            return true;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

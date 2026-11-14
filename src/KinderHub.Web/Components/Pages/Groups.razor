@@ -1,0 +1,154 @@
+@page "/groups"
+@attribute [Authorize(Roles = "Admin")]
+@inject IGroupService GroupService
+@inject ToastService Toast
+
+<PageTitle>Groups · KinderHub</PageTitle>
+
+<PageHeader Title="Groups" Subtitle="Classes, rooms and capacity">
+    <Actions>
+        <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+            <Icon Name="plus" Size="18" /> Add group
+        </button>
+    </Actions>
+</PageHeader>
+
+@if (groups is null)
+{
+    <LoadingSpinner Text="Loading groups..." />
+}
+else if (groups.Count == 0)
+{
+    <EmptyState Title="No groups yet" Message="Create the first group to start adding children." IconName="layers" />
+}
+else
+{
+    <div class="card-grid">
+        @foreach (var g in groups)
+        {
+            var percent = g.Capacity == 0 ? 0 : (int)Math.Round(100.0 * g.ChildrenCount / g.Capacity);
+            <div class="kh-card group-card" @key="g.Id">
+                <div class="group-card-head">
+                    <div>
+                        <h2 class="kh-card-title mb-1">@g.Name</h2>
+                        <div class="text-muted small">@g.AgeRange &middot; Room @g.Room</div>
+                    </div>
+                    <div class="row-actions">
+                        <button type="button" class="icon-btn" title="Edit" aria-label="@($"Edit {g.Name}")" @onclick="() => OpenEdit(g)">
+                            <Icon Name="edit" Size="16" />
+                        </button>
+                        <button type="button" class="icon-btn danger" title="Delete" aria-label="@($"Delete {g.Name}")" @onclick="() => deleteTarget = g">
+                            <Icon Name="trash" Size="16" />
+                        </button>
+                    </div>
+                </div>
+                <div class="group-teacher"><Icon Name="user" Size="16" /> @(g.TeacherName ?? "No teacher assigned")</div>
+                <div class="occupancy-row">
+                    <span>Children</span>
+                    <span class="text-muted">@g.ChildrenCount / @g.Capacity</span>
+                </div>
+                <div class="kh-progress" role="progressbar" aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100" aria-label="@($"{g.Name} occupancy")">
+                    <div class="kh-progress-bar" style="width:@(percent)%"></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<Modal IsOpen="isFormOpen" Title="@(editModel.Id == 0 ? "Add group" : "Edit group")" OnClose="CloseForm">
+    <GroupForm Model="editModel" IsBusy="isSaving" OnValidSubmit="SaveAsync" OnCancel="CloseForm" />
+</Modal>
+
+<ConfirmDialog IsOpen="deleteTarget is not null" Title="Delete group?"
+               Message="@($"Delete the group \"{deleteTarget?.Name}\"? A group can only be deleted when it has no children.")"
+               ConfirmText="Delete" IsBusy="isDeleting" OnConfirm="DeleteAsync" OnCancel="() => deleteTarget = null" />
+
+@code {
+    private IReadOnlyList<GroupDto>? groups;
+    private GroupEditModel editModel = new();
+    private GroupDto? deleteTarget;
+    private bool isFormOpen;
+    private bool isSaving;
+    private bool isDeleting;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            groups = await GroupService.GetAllAsync();
+        }
+        catch (Exception)
+        {
+            groups = Array.Empty<GroupDto>();
+            Toast.ShowError("Could not load groups.");
+        }
+    }
+
+    private void OpenCreate()
+    {
+        editModel = new GroupEditModel();
+        isFormOpen = true;
+    }
+
+    private void OpenEdit(GroupDto group)
+    {
+        editModel = GroupEditModel.FromDto(group);
+        isFormOpen = true;
+    }
+
+    private void CloseForm() => isFormOpen = false;
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            var isNew = editModel.Id == 0;
+            Result saveResult = isNew
+                ? await GroupService.CreateAsync(editModel)
+                : await GroupService.UpdateAsync(editModel);
+
+            if (saveResult.Succeeded)
+            {
+                Toast.ShowSuccess(isNew ? "Group created." : "Group updated.");
+                isFormOpen = false;
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(saveResult.Error ?? "Something went wrong.");
+            }
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleteTarget is null) return;
+        isDeleting = true;
+        try
+        {
+            var deleteResult = await GroupService.DeleteAsync(deleteTarget.Id);
+            if (deleteResult.Succeeded)
+            {
+                Toast.ShowSuccess("Group deleted.");
+                deleteTarget = null;
+                await LoadAsync();
+            }
+            else
+            {
+                Toast.ShowError(deleteResult.Error ?? "Could not delete.");
+                deleteTarget = null;
+            }
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

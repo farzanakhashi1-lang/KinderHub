@@ -1,47 +1,136 @@
 @page "/my-children"
-@using Microsoft.AspNetCore.Authorization
-@using KinderHub.Application.DTOs
-@using KinderHub.Application.Interfaces
 @attribute [Authorize(Roles = "Parent")]
 @inject IChildService ChildService
-@inject ICurrentUserService CurrentUser
+@inject IAttendanceService AttendanceService
+@inject IDailyReportService ReportService
+@inject ICurrentUserService CurrentUserService
+@inject ToastService Toast
 
-<PageTitle>My children</PageTitle>
+<PageTitle>My children · KinderHub</PageTitle>
 
-<h1>My children</h1>
-<p class="text-muted">Hello, @displayName! Only parents can open this page, and they see only their own children.</p>
+<PageHeader Title="My children" Subtitle="Attendance and daily reports" />
 
 @if (children is null)
 {
-    <p><em>Loading...</em></p>
+    <LoadingSpinner Text="Loading your children..." />
 }
 else if (children.Count == 0)
 {
-    <p>No children are linked to your account (@email).</p>
+    <EmptyState Title="No children linked to your account" IconName="heart"
+                Message="@($"Ask the kindergarten to register your child with the email {email}.")" />
 }
 else
 {
-    @foreach (var c in children)
+    @foreach (var child in children)
     {
-        <div class="card mb-3" @key="c.Id">
-            <div class="card-body">
-                <h5 class="card-title">@c.FullName</h5>
-                <p class="card-text mb-0">Age: @c.Age &middot; Group: @c.GroupName</p>
+        var history = histories.GetValueOrDefault(child.Id) ?? Array.Empty<AttendanceDto>();
+        var childReports = reports.GetValueOrDefault(child.Id) ?? Array.Empty<DailyReportDto>();
+        var todayRecord = history.FirstOrDefault(h => h.Date == today);
+
+        <section class="kh-card child-card" @key="child.Id" aria-label="@child.FullName">
+            <div class="child-head">
+                <span class="avatar lg">@(child.FirstName.Length > 0 ? child.FirstName[..1] : "?")</span>
+                <div>
+                    <h2 class="kh-card-title mb-1">@child.FullName</h2>
+                    <div class="text-muted">@child.Age years &middot; Group @child.GroupName</div>
+                </div>
+                <div class="child-today">
+                    <div class="text-muted small">Today</div>
+                    <AttendanceBadge Status="todayRecord?.Status" />
+                    @if (todayRecord?.CheckInTime is not null)
+                    {
+                        <div class="small text-muted mt-1">
+                            In @(todayRecord.CheckInTime?.ToString("HH:mm"))
+                            @if (todayRecord.CheckOutTime is not null)
+                            {
+                                <span> &middot; Out @(todayRecord.CheckOutTime?.ToString("HH:mm"))</span>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
-        </div>
+
+            <h3 class="section-title">Last 2 weeks</h3>
+            @if (history.Count == 0)
+            {
+                <p class="text-muted">No attendance yet.</p>
+            }
+            else
+            {
+                <div class="att-chips">
+                    @foreach (var day in history.OrderBy(h => h.Date))
+                    {
+                        <div class="att-chip @DisplayHelpers.StatusColor(day.Status)" title="@($"{day.Date:dd MMM}: {day.Status}")" @key="day.Id">
+                            <span class="att-chip-day">@day.Date.ToString("ddd")</span>
+                            <span class="att-chip-date">@day.Date.ToString("dd.MM")</span>
+                        </div>
+                    }
+                </div>
+                <div class="att-legend">
+                    <span><i class="dot success"></i> Present</span>
+                    <span><i class="dot warning"></i> Late</span>
+                    <span><i class="dot danger"></i> Absent</span>
+                    <span><i class="dot accent"></i> Sick</span>
+                </div>
+            }
+
+            <h3 class="section-title">Daily reports</h3>
+            @if (childReports.Count == 0)
+            {
+                <p class="text-muted">No reports yet. Teachers write them at the end of the day.</p>
+            }
+            else
+            {
+                <div class="report-list">
+                    @foreach (var r in childReports)
+                    {
+                        <div class="report-item" @key="r.Id">
+                            <div class="report-mood" aria-hidden="true">@DisplayHelpers.MoodEmoji(r.Mood)</div>
+                            <div class="report-body">
+                                <div class="report-date">@r.Date.ToString("dddd, d MMMM") &middot; <span class="text-muted">@r.Mood</span></div>
+                                <div><strong>Meals:</strong> @r.Meals</div>
+                                <div><strong>Nap:</strong> @r.NapMinutes min</div>
+                                <div><strong>Activities:</strong> @r.Activities</div>
+                                @if (!string.IsNullOrWhiteSpace(r.TeacherComment))
+                                {
+                                    <div class="report-comment">“@r.TeacherComment” &mdash; @r.AuthorName</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
     }
 }
 
 @code {
+    private readonly DateOnly today = DateOnly.FromDateTime(DateTime.Today);
     private IReadOnlyList<ChildDto>? children;
+    private readonly Dictionary<int, IReadOnlyList<AttendanceDto>> histories = new();
+    private readonly Dictionary<int, IReadOnlyList<DailyReportDto>> reports = new();
     private string email = string.Empty;
-    private string displayName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        var user = await CurrentUser.GetCurrentUserAsync();
-        email = user.Email;
-        displayName = user.DisplayName;
-        children = await ChildService.GetByParentEmailAsync(user.Email);
+        try
+        {
+            var user = await CurrentUserService.GetCurrentUserAsync();
+            email = user.Email;
+
+            // Security: a parent only gets children registered with THEIR email
+            var list = await ChildService.GetByParentEmailAsync(user.Email);
+            foreach (var child in list)
+            {
+                histories[child.Id] = await AttendanceService.GetChildHistoryAsync(child.Id, today.AddDays(-13), today);
+                reports[child.Id] = await ReportService.GetForChildAsync(child.Id, 5);
+            }
+            children = list;
+        }
+        catch (Exception)
+        {
+            children = Array.Empty<ChildDto>();
+            Toast.ShowError("Could not load your children's information.");
+        }
     }
 }

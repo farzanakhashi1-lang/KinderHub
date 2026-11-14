@@ -1,0 +1,43 @@
+@* Reusable form for adding or editing a group *@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <div class="form-grid">
+        <FormField Label="Group name" Id="group-name" ValidationFor="() => Model.Name">
+            <InputText id="group-name" class="form-control" @bind-Value="Model.Name" />
+        </FormField>
+        <FormField Label="Age range" Id="group-age" ValidationFor="() => Model.AgeRange" Help="For example: 3-4 years">
+            <InputText id="group-age" class="form-control" @bind-Value="Model.AgeRange" />
+        </FormField>
+        <FormField Label="Room" Id="group-room" ValidationFor="() => Model.Room">
+            <InputText id="group-room" class="form-control" @bind-Value="Model.Room" />
+        </FormField>
+        <FormField Label="Capacity" Id="group-capacity" ValidationFor="() => Model.Capacity">
+            <InputNumber id="group-capacity" class="form-control" @bind-Value="Model.Capacity" />
+        </FormField>
+        <div class="span-2">
+            <FormField Label="Teacher (optional)" Id="group-teacher" ValidationFor="() => Model.TeacherName">
+                <InputText id="group-teacher" class="form-control" @bind-Value="Model.TeacherName" />
+            </FormField>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-light" @onclick="CancelAsync" disabled="@IsBusy">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">
+            @if (IsBusy)
+            {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            }
+            Save
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public GroupEditModel Model { get; set; } = default!;
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task SubmitAsync() => OnValidSubmit.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

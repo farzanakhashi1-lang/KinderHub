@@ -1,0 +1,46 @@
+@* Reusable form for writing an announcement *@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+
+    <FormField Label="Title" Id="ann-title" ValidationFor="() => Model.Title">
+        <InputText id="ann-title" class="form-control" @bind-Value="Model.Title" />
+    </FormField>
+    <FormField Label="Message" Id="ann-message" ValidationFor="() => Model.Message">
+        <InputTextArea id="ann-message" class="form-control" rows="4" @bind-Value="Model.Message" />
+    </FormField>
+    <FormField Label="Who should see it?" Id="ann-group" ValidationFor="() => Model.GroupId">
+        <InputSelect id="ann-group" class="form-select" @bind-Value="Model.GroupId">
+            <option value="">Everyone</option>
+            @foreach (var g in Groups)
+            {
+                <option value="@g.Id">Only @g.Name</option>
+            }
+        </InputSelect>
+    </FormField>
+    <div class="form-check mb-3">
+        <InputCheckbox id="ann-important" class="form-check-input" @bind-Value="Model.IsImportant" />
+        <label class="form-check-label" for="ann-important">Mark as important</label>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-light" @onclick="CancelAsync" disabled="@IsBusy">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">
+            @if (IsBusy)
+            {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            }
+            Publish
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public AnnouncementEditModel Model { get; set; } = default!;
+    [Parameter] public IReadOnlyList<GroupDto> Groups { get; set; } = Array.Empty<GroupDto>();
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task SubmitAsync() => OnValidSubmit.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

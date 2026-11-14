@@ -1,0 +1,61 @@
+@* Reusable form for writing a child's daily report *@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+
+    <fieldset class="mb-3">
+        <legend class="form-label fw-bold fs-6">Mood</legend>
+        <div class="mood-picker">
+            @foreach (var mood in Enum.GetValues<Mood>())
+            {
+                <button type="button" class="mood-btn @(Model.Mood == mood ? "active" : "")"
+                        aria-pressed="@(Model.Mood == mood ? "true" : "false")" @onclick="() => Model.Mood = mood">
+                    <span class="mood-emoji" aria-hidden="true">@DisplayHelpers.MoodEmoji(mood)</span>
+                    <span>@mood</span>
+                </button>
+            }
+        </div>
+    </fieldset>
+
+    <div class="form-grid">
+        <div class="span-2">
+            <FormField Label="Meals" Id="report-meals" ValidationFor="() => Model.Meals" Help="For example: Ate all breakfast, half of lunch.">
+                <InputText id="report-meals" class="form-control" @bind-Value="Model.Meals" />
+            </FormField>
+        </div>
+        <FormField Label="Nap (minutes)" Id="report-nap" ValidationFor="() => Model.NapMinutes">
+            <InputNumber id="report-nap" class="form-control" @bind-Value="Model.NapMinutes" />
+        </FormField>
+        <div></div>
+        <div class="span-2">
+            <FormField Label="Activities" Id="report-activities" ValidationFor="() => Model.Activities">
+                <InputTextArea id="report-activities" class="form-control" rows="2" @bind-Value="Model.Activities" />
+            </FormField>
+        </div>
+        <div class="span-2">
+            <FormField Label="Comment for parents (optional)" Id="report-comment" ValidationFor="() => Model.TeacherComment">
+                <InputTextArea id="report-comment" class="form-control" rows="2" @bind-Value="Model.TeacherComment" />
+            </FormField>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-light" @onclick="CancelAsync" disabled="@IsBusy">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">
+            @if (IsBusy)
+            {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            }
+            Save report
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public DailyReportEditModel Model { get; set; } = default!;
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task SubmitAsync() => OnValidSubmit.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

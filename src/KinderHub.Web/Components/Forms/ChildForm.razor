@@ -1,0 +1,59 @@
+@* Reusable form for adding or editing a child *@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <div class="form-grid">
+        <FormField Label="First name" Id="child-first" ValidationFor="() => Model.FirstName">
+            <InputText id="child-first" class="form-control" @bind-Value="Model.FirstName" />
+        </FormField>
+        <FormField Label="Last name" Id="child-last" ValidationFor="() => Model.LastName">
+            <InputText id="child-last" class="form-control" @bind-Value="Model.LastName" />
+        </FormField>
+        <FormField Label="Date of birth" Id="child-dob" ValidationFor="() => Model.DateOfBirth">
+            <InputDate id="child-dob" class="form-control" @bind-Value="Model.DateOfBirth" />
+        </FormField>
+        <FormField Label="Group" Id="child-group" ValidationFor="() => Model.GroupId">
+            <InputSelect id="child-group" class="form-select" @bind-Value="Model.GroupId">
+                <option value="0">Choose a group...</option>
+                @foreach (var g in Groups)
+                {
+                    <option value="@g.Id">@g.Name (@g.ChildrenCount/@g.Capacity)</option>
+                }
+            </InputSelect>
+        </FormField>
+        <FormField Label="Parent name" Id="child-parent" ValidationFor="() => Model.ParentName">
+            <InputText id="child-parent" class="form-control" @bind-Value="Model.ParentName" />
+        </FormField>
+        <FormField Label="Parent email" Id="child-email" ValidationFor="() => Model.ParentEmail" Help="The parent logs in with this email to see the child.">
+            <InputText id="child-email" type="email" class="form-control" @bind-Value="Model.ParentEmail" />
+        </FormField>
+        <FormField Label="Parent phone" Id="child-phone" ValidationFor="() => Model.ParentPhone">
+            <InputText id="child-phone" type="tel" class="form-control" @bind-Value="Model.ParentPhone" />
+        </FormField>
+        <div class="span-2">
+            <FormField Label="Notes (optional)" Id="child-notes" ValidationFor="() => Model.Notes">
+                <InputTextArea id="child-notes" class="form-control" rows="2" @bind-Value="Model.Notes" />
+            </FormField>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="button" class="btn btn-light" @onclick="CancelAsync" disabled="@IsBusy">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">
+            @if (IsBusy)
+            {
+                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            }
+            Save
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public ChildEditModel Model { get; set; } = default!;
+    [Parameter] public IReadOnlyList<GroupDto> Groups { get; set; } = Array.Empty<GroupDto>();
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task SubmitAsync() => OnValidSubmit.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

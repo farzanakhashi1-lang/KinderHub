@@ -1,0 +1,6 @@
+@* Colored badge for an attendance status (Present, Late, Absent, Sick, Not marked) *@
+<Badge Text="@(Status?.ToString() ?? "Not marked")" Color="@DisplayHelpers.StatusColor(Status)" />
+
+@code {
+    [Parameter] public AttendanceStatus? Status { get; set; }
+}
