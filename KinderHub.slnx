@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KinderHub.Application/KinderHub.Application.csproj" />
+    <Project Path="src/KinderHub.Domain/KinderHub.Domain.csproj" />
+    <Project Path="src/KinderHub.Infrastructure/KinderHub.Infrastructure.csproj" />
+    <Project Path="src/KinderHub.Web/KinderHub.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KinderHub.Tests/KinderHub.Tests.csproj" />
+  </Folder>
+</Solution>

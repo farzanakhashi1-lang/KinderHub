@@ -1,0 +1,47 @@
+@page "/my-children"
+@using Microsoft.AspNetCore.Authorization
+@using KinderHub.Application.DTOs
+@using KinderHub.Application.Interfaces
+@attribute [Authorize(Roles = "Parent")]
+@inject IChildService ChildService
+@inject ICurrentUserService CurrentUser
+
+<PageTitle>My children</PageTitle>
+
+<h1>My children</h1>
+<p class="text-muted">Hello, @displayName! Only parents can open this page, and they see only their own children.</p>
+
+@if (children is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (children.Count == 0)
+{
+    <p>No children are linked to your account (@email).</p>
+}
+else
+{
+    @foreach (var c in children)
+    {
+        <div class="card mb-3" @key="c.Id">
+            <div class="card-body">
+                <h5 class="card-title">@c.FullName</h5>
+                <p class="card-text mb-0">Age: @c.Age &middot; Group: @c.GroupName</p>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private IReadOnlyList<ChildDto>? children;
+    private string email = string.Empty;
+    private string displayName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await CurrentUser.GetCurrentUserAsync();
+        email = user.Email;
+        displayName = user.DisplayName;
+        children = await ChildService.GetByParentEmailAsync(user.Email);
+    }
+}
