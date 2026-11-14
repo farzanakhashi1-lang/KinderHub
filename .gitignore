@@ -480,3 +480,10 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# KinderHub local files
+*.db
+*.db-shm
+*.db-wal
+coverage-report/
+TestResults/

@@ -13,11 +13,16 @@ public static class WebEndpoints
 {
     public static void MapKinderHubEndpoints(WebApplication app)
     {
+        // API documentation (OpenAPI): http://localhost:5161/openapi/v1.json
+        app.MapOpenApi();
+
         // SignalR hub for live notifications
         app.MapHub<NotificationHub>("/hubs/notifications");
 
         // Health check: open http://localhost:5161/health
-        app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteHealthJsonAsync });
+        app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteHealthJsonAsync })
+            .WithTags("Monitoring")
+            .WithDisplayName("Health check");
 
         // CSV export of attendance (only Admin and Teacher)
         app.MapGet("/export/attendance.csv", async (int? groupId, IAttendanceService attendance, CancellationToken ct) =>
@@ -26,7 +31,12 @@ public static class WebEndpoints
                 var file = CsvExporter.Attendance(page.Items);
                 return Results.File(file, "text/csv; charset=utf-8", $"attendance-{DateTime.Today:yyyy-MM-dd}.csv");
             })
-            .RequireAuthorization(policy => policy.RequireRole(Roles.Admin, Roles.Teacher));
+            .RequireAuthorization(policy => policy.RequireRole(Roles.Admin, Roles.Teacher))
+            .WithName("ExportAttendanceCsv")
+            .WithTags("Export")
+            .WithSummary("Download attendance as CSV")
+            .WithDescription("Admin or Teacher only. Optional groupId filters one group. UTF-8 with BOM, protected against CSV injection.")
+            .Produces(StatusCodes.Status200OK, contentType: "text/csv");
     }
 
     private static Task WriteHealthJsonAsync(HttpContext context, HealthReport report)

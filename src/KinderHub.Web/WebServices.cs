@@ -25,6 +25,9 @@ public static class WebServices
         // Health checks: /health tells if the app and the database are OK
         services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
+        // API documentation: OpenAPI description at /openapi/v1.json
+        services.AddOpenApi();
+
         return services;
     }
 }
