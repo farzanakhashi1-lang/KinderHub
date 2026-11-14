@@ -34,6 +34,9 @@ public class AnnouncementService(
 
     public async Task<Result<AnnouncementDto>> CreateAsync(AnnouncementEditModel model, string authorName, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return Result<AnnouncementDto>.Failure(validation.Error!);
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         string? groupName = null;
@@ -72,6 +75,9 @@ public class AnnouncementService(
 
     public async Task<Result> UpdateAsync(AnnouncementEditModel model, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return validation;
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var announcement = await db.Announcements.FirstOrDefaultAsync(a => a.Id == model.Id, ct);
         if (announcement is null) return Result.Failure("Announcement not found.");

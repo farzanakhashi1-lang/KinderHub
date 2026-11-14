@@ -39,42 +39,53 @@ public class DailyReportService(
     // Creates the report, or updates it if one already exists for this child and day
     public async Task<Result> SaveAsync(DailyReportEditModel model, string authorName, CancellationToken ct = default)
     {
-        if (model.Date is null) return Result.Failure("Date is required.");
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return validation;
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var child = await db.Children.AsNoTracking()
-            .Where(c => c.Id == model.ChildId)
-            .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
-            .FirstOrDefaultAsync(ct);
-        if (child is null) return Result.Failure("Child not found.");
+        var date = model.Date!.Value;
 
-        var date = model.Date.Value;
-        var report = await db.DailyReports.FirstOrDefaultAsync(r => r.ChildId == model.ChildId && r.Date == date, ct);
-        if (report is null)
+        // Same safe retry as attendance: one report per child per day, even if two teachers save together
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            report = new DailyReport { ChildId = model.ChildId, Date = date };
-            db.DailyReports.Add(report);
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var child = await db.Children.AsNoTracking()
+                .Where(c => c.Id == model.ChildId)
+                .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
+                .FirstOrDefaultAsync(ct);
+            if (child is null) return Result.Failure("Child not found.");
+
+            var report = await db.DailyReports.FirstOrDefaultAsync(r => r.ChildId == model.ChildId && r.Date == date, ct);
+            if (report is null)
+            {
+                report = new DailyReport { ChildId = model.ChildId, Date = date };
+                db.DailyReports.Add(report);
+            }
+
+            report.Mood = model.Mood;
+            report.Meals = model.Meals.Trim();
+            report.NapMinutes = model.NapMinutes;
+            report.Activities = model.Activities.Trim();
+            report.TeacherComment = string.IsNullOrWhiteSpace(model.TeacherComment) ? null : model.TeacherComment.Trim();
+            report.AuthorName = authorName;
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                await notifier.PublishAsync(new ReportSavedEvent(model.ChildId, child.GroupId, child.Name, date));
+                return Result.Success();
+            }
+            catch (DbUpdateException ex) when (attempt == 1 && ex.IsUniqueConstraintViolation())
+            {
+                logger.LogWarning("Report for child {ChildId} on {Date} was saved by someone else at the same time. Retrying.", model.ChildId, date);
+            }
+            catch (DbUpdateException ex)
+            {
+                logger.LogError(ex, "Failed to save daily report for child {ChildId}", model.ChildId);
+                return Result.Failure("Could not save the report. Please try again.");
+            }
         }
 
-        report.Mood = model.Mood;
-        report.Meals = model.Meals.Trim();
-        report.NapMinutes = model.NapMinutes;
-        report.Activities = model.Activities.Trim();
-        report.TeacherComment = string.IsNullOrWhiteSpace(model.TeacherComment) ? null : model.TeacherComment.Trim();
-        report.AuthorName = authorName;
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogError(ex, "Failed to save daily report for child {ChildId}", model.ChildId);
-            return Result.Failure("Could not save the report. Please try again.");
-        }
-
-        await notifier.PublishAsync(new ReportSavedEvent(model.ChildId, child.GroupId, child.Name, date));
-        return Result.Success();
+        return Result.Failure("Could not save the report. Please try again.");
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)

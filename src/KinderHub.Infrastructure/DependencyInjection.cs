@@ -11,8 +11,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
     {
-        // DbContextFactory is the recommended way for Blazor Server
-        services.AddDbContextFactory<KinderHubDbContext>(options => options.UseSqlite(connectionString));
+        // DbContextFactory is the recommended way for Blazor Server.
+        // The retry strategy makes saving resilient to short "database busy" moments.
+        services.AddDbContextFactory<KinderHubDbContext>(options =>
+            options.UseSqlite(connectionString, sqlite =>
+                sqlite.ExecutionStrategy(deps => new SqliteRetryStrategy(deps))));
 
         // Services: pages ask for the INTERFACE, they get this implementation
         services.AddScoped<IGroupService, GroupService>();

@@ -59,43 +59,56 @@ public class AttendanceService(
     // Creates the record, or updates it if one already exists for this child and day
     public async Task<Result> SaveAsync(AttendanceEditModel model, CancellationToken ct = default)
     {
-        if (model.Date is null || model.Status is null) return Result.Failure("Date and status are required.");
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return validation;
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var child = await db.Children.AsNoTracking()
-            .Where(c => c.Id == model.ChildId)
-            .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
-            .FirstOrDefaultAsync(ct);
-        if (child is null) return Result.Failure("Child not found.");
+        var date = model.Date!.Value;
 
-        var date = model.Date.Value;
-        var record = await db.AttendanceRecords.FirstOrDefaultAsync(a => a.ChildId == model.ChildId && a.Date == date, ct);
-        if (record is null)
+        // Two teachers can save the same child at the same second. The unique index
+        // (one record per child per day) protects the data. If we lose that race,
+        // we simply try once more: the second time it becomes an UPDATE.
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            record = new AttendanceRecord { ChildId = model.ChildId, Date = date };
-            db.AttendanceRecords.Add(record);
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var child = await db.Children.AsNoTracking()
+                .Where(c => c.Id == model.ChildId)
+                .Select(c => new { c.GroupId, Name = c.FirstName + " " + c.LastName })
+                .FirstOrDefaultAsync(ct);
+            if (child is null) return Result.Failure("Child not found.");
+
+            var record = await db.AttendanceRecords.FirstOrDefaultAsync(a => a.ChildId == model.ChildId && a.Date == date, ct);
+            if (record is null)
+            {
+                record = new AttendanceRecord { ChildId = model.ChildId, Date = date };
+                db.AttendanceRecords.Add(record);
+            }
+
+            record.Status = model.Status!.Value;
+            record.CheckInTime = model.CheckInTime;
+            record.CheckOutTime = model.CheckOutTime;
+            record.PickedUpBy = string.IsNullOrWhiteSpace(model.PickedUpBy) ? null : model.PickedUpBy.Trim();
+            record.Note = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+
+                // Tell everyone who is online (parents, other teachers, dashboards)
+                await notifier.PublishAsync(new AttendanceChangedEvent(model.ChildId, child.GroupId, child.Name, date,
+                    record.Status, record.CheckInTime, record.CheckOutTime));
+                return Result.Success();
+            }
+            catch (DbUpdateException ex) when (attempt == 1 && ex.IsUniqueConstraintViolation())
+            {
+                logger.LogWarning("Attendance for child {ChildId} on {Date} was saved by someone else at the same time. Retrying.", model.ChildId, date);
+            }
+            catch (DbUpdateException ex)
+            {
+                logger.LogError(ex, "Failed to save attendance for child {ChildId} on {Date}", model.ChildId, date);
+                return Result.Failure("Could not save attendance. Please refresh and try again.");
+            }
         }
 
-        record.Status = model.Status.Value;
-        record.CheckInTime = model.CheckInTime;
-        record.CheckOutTime = model.CheckOutTime;
-        record.PickedUpBy = string.IsNullOrWhiteSpace(model.PickedUpBy) ? null : model.PickedUpBy.Trim();
-        record.Note = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex)
-        {
-            logger.LogError(ex, "Failed to save attendance for child {ChildId} on {Date}", model.ChildId, date);
-            return Result.Failure("Could not save attendance. Please refresh and try again.");
-        }
-
-        // Tell everyone who is online (parents, other teachers, dashboards)
-        await notifier.PublishAsync(new AttendanceChangedEvent(model.ChildId, child.GroupId, child.Name, date,
-            record.Status, record.CheckInTime, record.CheckOutTime));
-
-        return Result.Success();
+        return Result.Failure("Could not save attendance. Please refresh and try again.");
     }
 }

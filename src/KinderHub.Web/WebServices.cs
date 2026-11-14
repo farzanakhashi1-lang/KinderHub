@@ -1,4 +1,5 @@
 using KinderHub.Application.Interfaces;
+using KinderHub.Web.Health;
 using KinderHub.Web.Realtime;
 using KinderHub.Web.Services;
 using KinderHub.Web.State;
@@ -20,6 +21,9 @@ public static class WebServices
         // Real-time: SignalR + one shared notifier for the whole app
         services.AddSignalR();
         services.AddSingleton<IRealtimeNotifier, RealtimeNotifier>();
+
+        // Health checks: /health tells if the app and the database are OK
+        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
         return services;
     }

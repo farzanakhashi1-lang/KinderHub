@@ -30,6 +30,9 @@ public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
 
     public async Task<Result<int>> CreateAsync(GroupEditModel model, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return Result<int>.Failure(validation.Error!);
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var name = model.Name.Trim();
         if (await db.Groups.AnyAsync(g => g.Name.ToLower() == name.ToLower(), ct))
@@ -54,6 +57,9 @@ public class GroupService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
 
     public async Task<Result> UpdateAsync(GroupEditModel model, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return validation;
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var group = await db.Groups.Include(g => g.Children).FirstOrDefaultAsync(g => g.Id == model.Id, ct);
         if (group is null) return Result.Failure("Group not found.");

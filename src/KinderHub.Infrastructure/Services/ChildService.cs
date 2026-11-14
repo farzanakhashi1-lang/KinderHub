@@ -90,6 +90,9 @@ public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
 
     public async Task<Result<int>> CreateAsync(ChildEditModel model, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return Result<int>.Failure(validation.Error!);
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var groupCheck = await CheckGroupAsync(db, model.GroupId, ct);
@@ -114,6 +117,9 @@ public class ChildService(IDbContextFactory<KinderHubDbContext> dbFactory, ILogg
 
     public async Task<Result> UpdateAsync(ChildEditModel model, CancellationToken ct = default)
     {
+        var validation = ModelValidator.Validate(model);
+        if (!validation.Succeeded) return validation;
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var child = await db.Children.FirstOrDefaultAsync(c => c.Id == model.Id, ct);
         if (child is null) return Result.Failure("Child not found.");
