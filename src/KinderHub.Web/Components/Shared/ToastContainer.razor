@@ -1,0 +1,31 @@
+@implements IDisposable
+@inject ToastService ToastService
+
+<div class="kh-toast-stack" role="status" aria-live="polite">
+    @foreach (var toast in ToastService.GetToasts())
+    {
+        <div class="kh-toast kh-toast-@toast.Level.ToString().ToLower()" @key="toast.Id">
+            <Icon Name="@IconFor(toast.Level)" />
+            <span class="kh-toast-text">@toast.Text</span>
+            <button type="button" class="icon-btn sm" aria-label="Dismiss" @onclick="() => ToastService.Remove(toast.Id)">
+                <Icon Name="x" Size="16" />
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => ToastService.OnChange += OnToastsChanged;
+
+    private void OnToastsChanged() => InvokeAsync(StateHasChanged);
+
+    private static string IconFor(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "check",
+        ToastLevel.Error => "alert",
+        ToastLevel.Warning => "alert",
+        _ => "info"
+    };
+
+    public void Dispose() => ToastService.OnChange -= OnToastsChanged;
+}

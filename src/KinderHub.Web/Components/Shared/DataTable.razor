@@ -1,0 +1,40 @@
+@typeparam TItem
+@* Generic, templated table. Works with ANY type of item (children, groups, reports...). *@
+
+<div class="kh-table-wrap">
+    @if (IsLoading)
+    {
+        <LoadingSpinner Text="@LoadingText" />
+    }
+    else if (Items is null || Items.Count == 0)
+    {
+        <EmptyState Title="@EmptyTitle" Message="@EmptyMessage" IconName="inbox" />
+    }
+    else
+    {
+        <table class="kh-table">
+            <thead>
+                <tr>@Header</tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr @key="GetKey(item)">@Row(item)</tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TItem>? Items { get; set; }
+    [Parameter, EditorRequired] public RenderFragment Header { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment<TItem> Row { get; set; } = default!;
+    [Parameter] public Func<TItem, object>? KeySelector { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string LoadingText { get; set; } = "Loading...";
+    [Parameter] public string EmptyTitle { get; set; } = "Nothing here yet";
+    [Parameter] public string EmptyMessage { get; set; } = "No records found.";
+
+    private object? GetKey(TItem item) => KeySelector is null ? item : KeySelector(item);
+}

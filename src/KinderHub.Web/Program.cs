@@ -43,7 +43,7 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 var kinderHubConnection = builder.Configuration.GetConnectionString("KinderHubConnection")
     ?? throw new InvalidOperationException("Connection string 'KinderHubConnection' not found.");
 builder.Services.AddInfrastructure(kinderHubConnection);
-builder.Services.AddScoped<KinderHub.Application.Interfaces.ICurrentUserService, KinderHub.Web.Services.CurrentUserService>();
+KinderHub.Web.WebServices.AddKinderHubWeb(builder.Services);
 var app = builder.Build();
 
 // Create the database and fill it with demo data

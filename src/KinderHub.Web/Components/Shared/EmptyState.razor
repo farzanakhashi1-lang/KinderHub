@@ -1,0 +1,17 @@
+@* Friendly message when a list is empty *@
+<div class="kh-empty">
+    <div class="kh-empty-icon"><Icon Name="@IconName" Size="28" /></div>
+    <h2 class="kh-empty-title">@Title</h2>
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <p class="kh-empty-message">@Message</p>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Nothing here yet";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string IconName { get; set; } = "inbox";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

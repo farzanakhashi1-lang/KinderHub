@@ -1,0 +1,24 @@
+@* Previous / Next page buttons. Supports @bind-Page. *@
+@if (TotalPages > 1)
+{
+    <nav class="kh-pager" aria-label="Pagination">
+        <span class="kh-pager-info">Page @Page of @TotalPages &middot; @TotalCount items</span>
+        <div class="kh-pager-buttons">
+            <button type="button" class="icon-btn" disabled="@(Page <= 1)" aria-label="Previous page" @onclick="() => GoAsync(Page - 1)">
+                <Icon Name="chevron-left" />
+            </button>
+            <button type="button" class="icon-btn" disabled="@(Page >= TotalPages)" aria-label="Next page" @onclick="() => GoAsync(Page + 1)">
+                <Icon Name="chevron-right" />
+            </button>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+
+    private Task GoAsync(int page) => PageChanged.InvokeAsync(Math.Clamp(page, 1, Math.Max(1, TotalPages)));
+}

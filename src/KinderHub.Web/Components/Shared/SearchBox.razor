@@ -1,0 +1,43 @@
+@implements IDisposable
+@* Search input with "debounce": waits until the user stops typing before searching,
+   so we don't hit the database on every key press. Supports @bind-Value. *@
+
+<div class="kh-search">
+    <Icon Name="search" Size="18" />
+    <input type="search" class="form-control" placeholder="@Placeholder" aria-label="@Placeholder"
+           value="@Value" @oninput="OnInputAsync" />
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Search...";
+    [Parameter] public int DelayMs { get; set; } = 400;
+
+    private CancellationTokenSource? cts;
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        cts?.Cancel();
+        cts = new CancellationTokenSource();
+        var token = cts.Token;
+        var text = e.Value?.ToString();
+
+        try
+        {
+            await Task.Delay(DelayMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return; // user typed again, wait for the next pause
+        }
+
+        await ValueChanged.InvokeAsync(text);
+    }
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        cts?.Dispose();
+    }
+}

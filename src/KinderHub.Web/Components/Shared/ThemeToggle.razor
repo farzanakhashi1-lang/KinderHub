@@ -1,0 +1,19 @@
+@implements IDisposable
+@inject AppState AppState
+
+@if (RendererInfo.IsInteractive)
+{
+    <button type="button" class="icon-btn" @onclick="AppState.ToggleThemeAsync"
+            title="@(AppState.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")"
+            aria-label="@(AppState.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")">
+        <Icon Name="@(AppState.IsDarkMode ? "sun" : "moon")" />
+    </button>
+}
+
+@code {
+    protected override void OnInitialized() => AppState.OnChange += OnStateChanged;
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AppState.OnChange -= OnStateChanged;
+}

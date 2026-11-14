@@ -1,19 +1,61 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppState AppState
+@inject NavigationManager Navigation
 
-<div class="page">
-    <div class="sidebar">
+<div class="app-shell" data-bs-theme="@(AppState.IsDarkMode ? "dark" : "light")">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    @* Checkbox that opens/closes the menu on phones (works even without JavaScript) *@
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-input" @bind="navOpen" aria-label="Open navigation menu" />
+
+    <aside class="sidebar" aria-label="Sidebar">
         <NavMenu />
+    </aside>
+    <label for="nav-toggle" class="sidebar-backdrop" aria-hidden="true"></label>
+
+    <div class="main-area">
+        <header class="topbar">
+            <label for="nav-toggle" class="icon-btn menu-btn" title="Open menu">
+                <Icon Name="menu" />
+            </label>
+            <a href="" class="topbar-brand"><span class="brand-logo sm">K</span> KinderHub</a>
+
+            <div class="topbar-right">
+                <ThemeToggle />
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="user-chip">
+                            <span class="avatar">@Initial(context.User)</span>
+                            <span class="user-chip-text">
+                                <strong>@DisplayName(context.User)</strong>
+                                <small>@RoleName(context.User)</small>
+                            </span>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </header>
+
+        <main id="main-content" class="content" tabindex="-1">
+            <ErrorBoundary @ref="errorBoundary">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <div class="kh-card error-card" role="alert">
+                        <h2 class="h5">Oops, something went wrong.</h2>
+                        <p class="text-muted">The problem was logged. Please try again.</p>
+                        <button type="button" class="btn btn-primary" @onclick="Recover">Try again</button>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
+        </main>
+
+        <footer class="app-footer">&copy; @DateTime.Today.Year KinderHub &middot; Kindergarten management system</footer>
     </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+    <ToastContainer />
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -21,3 +63,55 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool navOpen;
+    private ErrorBoundary? errorBoundary;
+
+    protected override void OnInitialized()
+    {
+        AppState.OnChange += OnAppStateChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Load the saved theme once the page is interactive
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            await AppState.LoadAsync();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        navOpen = false;            // close the phone menu after navigating
+        errorBoundary?.Recover();   // clear an old error when the user goes to another page
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnAppStateChanged() => InvokeAsync(StateHasChanged);
+
+    private void Recover() => errorBoundary?.Recover();
+
+    private static string DisplayName(ClaimsPrincipal user) =>
+        user.FindFirst(KinderHubClaims.FullName)?.Value ?? user.Identity?.Name ?? "User";
+
+    private static string Initial(ClaimsPrincipal user)
+    {
+        var name = DisplayName(user).Trim();
+        return name.Length > 0 ? name[..1].ToUpperInvariant() : "?";
+    }
+
+    private static string RoleName(ClaimsPrincipal user) =>
+        user.IsInRole(Roles.Admin) ? "Administrator"
+        : user.IsInRole(Roles.Teacher) ? "Teacher"
+        : user.IsInRole(Roles.Parent) ? "Parent"
+        : "No role yet";
+
+    public void Dispose()
+    {
+        AppState.OnChange -= OnAppStateChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

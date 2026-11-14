@@ -1,0 +1,6 @@
+<span class="kh-badge kh-badge-@Color">@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    [Parameter] public string Color { get; set; } = "neutral"; // primary | success | danger | warning | accent | neutral
+}

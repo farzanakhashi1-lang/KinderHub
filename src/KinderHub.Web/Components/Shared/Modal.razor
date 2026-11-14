@@ -1,0 +1,53 @@
+@* Reusable pop-up window. Closes with the X button, the Esc key, or a click outside. *@
+@if (IsOpen)
+{
+    <div class="kh-modal" role="dialog" aria-modal="true" aria-labelledby="@titleId"
+         tabindex="-1" @ref="dialogRef" @onclick="CloseAsync" @onkeydown="OnKeyDownAsync">
+        <div class="kh-modal-dialog kh-modal-@Size" @onclick:stopPropagation="true">
+            <div class="kh-modal-header">
+                <h2 id="@titleId" class="kh-modal-title">@Title</h2>
+                <button type="button" class="icon-btn" aria-label="Close" @onclick="CloseAsync">
+                    <Icon Name="x" />
+                </button>
+            </div>
+            <div class="kh-modal-body">@ChildContent</div>
+            @if (Footer is not null)
+            {
+                <div class="kh-modal-footer">@Footer</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Size { get; set; } = "md"; // sm | md | lg
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private readonly string titleId = $"modal-title-{Guid.NewGuid():N}";
+    private ElementReference dialogRef;
+    private bool wasOpen;
+    private bool shouldFocus;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !wasOpen) shouldFocus = true;
+        wasOpen = IsOpen;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldFocus)
+        {
+            shouldFocus = false;
+            try { await dialogRef.FocusAsync(); } catch { /* element not ready */ }
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private Task OnKeyDownAsync(KeyboardEventArgs e) => e.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
+}

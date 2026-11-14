@@ -1,73 +1,76 @@
-﻿@implements IDisposable
-
+@implements IDisposable
 @inject NavigationManager NavigationManager
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">KinderHub.Web</a>
-    </div>
+<div class="brand">
+    <a href="" class="brand-link">
+        <span class="brand-logo">K</span>
+        <span class="brand-text">KinderHub<small>Kindergarten app</small></span>
+    </a>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="side-nav" aria-label="Main navigation">
+    <NavLink class="kh-nav-link" href="" Match="NavLinkMatch.All">
+        <Icon Name="home" /><span>Home</span>
+    </NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+    @* Only Admin and Teacher see these links *@
+    <AuthorizeView Roles="Admin,Teacher">
+        <div class="nav-heading">Kindergarten</div>
+        <NavLink class="kh-nav-link" href="children">
+            <Icon Name="users" /><span>Children</span>
+        </NavLink>
+        <NavLink class="kh-nav-link" href="attendance">
+            <Icon Name="check-square" /><span>Attendance</span>
+        </NavLink>
+        <NavLink class="kh-nav-link" href="reports">
+            <Icon Name="clipboard" /><span>Daily reports</span>
+        </NavLink>
+    </AuthorizeView>
+
+    @* Only Admin sees this link *@
+    <AuthorizeView Roles="Admin">
+        <NavLink class="kh-nav-link" href="groups">
+            <Icon Name="layers" /><span>Groups</span>
+        </NavLink>
+    </AuthorizeView>
+
+    @* Only Parent sees this link *@
+    <AuthorizeView Roles="Parent">
+        <div class="nav-heading">My family</div>
+        <NavLink class="kh-nav-link" href="my-children">
+            <Icon Name="heart" /><span>My children</span>
+        </NavLink>
+    </AuthorizeView>
+
+    <AuthorizeView>
+        <Authorized>
+            <NavLink class="kh-nav-link" href="announcements">
+                <Icon Name="bell" /><span>Announcements</span>
             </NavLink>
-        </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            <div class="nav-heading">Account</div>
+            <NavLink class="kh-nav-link" href="Account/Manage">
+                <Icon Name="user" /><span>My profile</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            <form action="Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                <button type="submit" class="kh-nav-link kh-nav-button">
+                    <Icon Name="log-out" /><span>Logout</span>
+                </button>
+            </form>
+        </Authorized>
+        <NotAuthorized>
+            <div class="nav-heading">Account</div>
+            <NavLink class="kh-nav-link" href="Account/Login">
+                <Icon Name="log-in" /><span>Login</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
+            <NavLink class="kh-nav-link" href="Account/Register">
+                <Icon Name="user-plus" /><span>Register</span>
             </NavLink>
-        </div>
-
-        <AuthorizeView>
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
+        </NotAuthorized>
+    </AuthorizeView>
+</nav>
 
 @code {
     private string? currentUrl;
@@ -84,9 +87,5 @@
         StateHasChanged();
     }
 
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= OnLocationChanged;
-    }
+    public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
 }
-

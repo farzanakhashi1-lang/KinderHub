@@ -1,0 +1,20 @@
+@* Small statistic card: icon + big number + label *@
+<div class="kh-stat kh-stat-@Color">
+    <div class="kh-stat-icon"><Icon Name="@IconName" Size="22" /></div>
+    <div class="kh-stat-body">
+        <div class="kh-stat-value">@Value</div>
+        <div class="kh-stat-title">@Title</div>
+        @if (!string.IsNullOrWhiteSpace(Hint))
+        {
+            <div class="kh-stat-hint">@Hint</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string IconName { get; set; } = "info";
+    [Parameter] public string Color { get; set; } = "primary"; // primary | success | danger | warning | accent
+    [Parameter] public string? Hint { get; set; }
+}

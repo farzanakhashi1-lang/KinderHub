@@ -1,0 +1,23 @@
+@typeparam TValue
+@* Label + input + validation message, always with the same look *@
+
+<div class="kh-field">
+    <label class="form-label" for="@Id">@Label</label>
+    @ChildContent
+    @if (ValidationFor is not null)
+    {
+        <ValidationMessage For="ValidationFor" />
+    }
+    @if (!string.IsNullOrWhiteSpace(Help))
+    {
+        <div class="form-text">@Help</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public Expression<Func<TValue>>? ValidationFor { get; set; }
+}

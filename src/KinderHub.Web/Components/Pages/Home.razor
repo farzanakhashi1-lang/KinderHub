@@ -1,7 +1,131 @@
-﻿@page "/"
+@page "/"
+@inject IDashboardService DashboardService
+@inject ICurrentUserService CurrentUserService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>KinderHub</PageTitle>
 
-<h1>Hello, world!</h1>
+<AuthorizeView>
+    <NotAuthorized>
+        <section class="hero">
+            <div class="hero-text">
+                <span class="hero-tag">Kindergarten management</span>
+                <h1>Every day of your child, <span class="text-gradient">in one place.</span></h1>
+                <p>KinderHub connects administrators, teachers and parents: attendance, daily reports and announcements, updated in real time.</p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary btn-lg" href="Account/Login">Log in</a>
+                    <a class="btn btn-outline-primary btn-lg" href="Account/Register">Create account</a>
+                </div>
+            </div>
+            <div class="kh-card hero-card">
+                <h2 class="kh-card-title">Demo accounts</h2>
+                <ul class="demo-list">
+                    <li><Badge Text="Admin" Color="primary" /> <code>admin@kinderhub.kz</code> <code>Admin123!</code></li>
+                    <li><Badge Text="Teacher" Color="success" /> <code>teacher@kinderhub.kz</code> <code>Teacher123!</code></li>
+                    <li><Badge Text="Parent" Color="accent" /> <code>parent@kinderhub.kz</code> <code>Parent123!</code></li>
+                </ul>
+            </div>
+        </section>
 
-Welcome to your new app.
+        <section class="feature-grid" aria-label="Features">
+            <div class="kh-card feature">
+                <div class="feature-icon"><Icon Name="check-square" Size="24" /></div>
+                <h2 class="kh-card-title">Attendance</h2>
+                <p>Teachers mark check-in and check-out in seconds. Parents see it instantly.</p>
+            </div>
+            <div class="kh-card feature">
+                <div class="feature-icon accent"><Icon Name="clipboard" Size="24" /></div>
+                <h2 class="kh-card-title">Daily reports</h2>
+                <p>Meals, nap time, mood and activities: the whole day in one short report.</p>
+            </div>
+            <div class="kh-card feature">
+                <div class="feature-icon success"><Icon Name="bell" Size="24" /></div>
+                <h2 class="kh-card-title">Announcements</h2>
+                <p>Important news for everyone or for one group, delivered live.</p>
+            </div>
+        </section>
+    </NotAuthorized>
+
+    <Authorized>
+        <PageHeader Title="@($"Hello, {user.DisplayName}!")" Subtitle="@DateTime.Today.ToString("dddd, d MMMM yyyy")" />
+
+        @if (user.IsAdmin || user.IsTeacher)
+        {
+            @if (stats is null)
+            {
+                <LoadingSpinner Text="Loading today's numbers..." />
+            }
+            else
+            {
+                <div class="stat-grid">
+                    <StatCard Title="Children" Value="@stats.TotalChildren.ToString()" IconName="users" Color="primary" Hint="@($"{stats.TotalGroups} groups")" />
+                    <StatCard Title="Present today" Value="@stats.PresentToday.ToString()" IconName="check" Color="success" />
+                    <StatCard Title="Absent today" Value="@stats.AbsentToday.ToString()" IconName="user-x" Color="danger" Hint="@($"{stats.NotMarkedToday} not marked yet")" />
+                    <StatCard Title="Attendance, 14 days" Value="@($"{stats.AttendanceRate14Days}%")" IconName="bar-chart" Color="accent" />
+                </div>
+
+                <div class="card-grid">
+                    <div class="kh-card">
+                        <h2 class="kh-card-title">Groups</h2>
+                        @foreach (var g in stats.Occupancy)
+                        {
+                            var percent = g.Capacity == 0 ? 0 : (int)Math.Round(100.0 * g.Children / g.Capacity);
+                            <div class="occupancy" @key="g.GroupName">
+                                <div class="occupancy-row">
+                                    <span>@g.GroupName</span>
+                                    <span class="text-muted">@g.Children / @g.Capacity</span>
+                                </div>
+                                <div class="kh-progress" role="progressbar" aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100" aria-label="@g.GroupName occupancy">
+                                    <div class="kh-progress-bar" style="width:@(percent)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="kh-card">
+                        <h2 class="kh-card-title">Quick actions</h2>
+                        <div class="quick-actions">
+                            <a class="quick-action" href="attendance"><Icon Name="check-square" /> Mark attendance</a>
+                            <a class="quick-action" href="reports"><Icon Name="clipboard" /> Write daily reports</a>
+                            <a class="quick-action" href="children"><Icon Name="users" /> Children list</a>
+                            <a class="quick-action" href="announcements"><Icon Name="bell" /> Announcements</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else if (user.IsParent)
+        {
+            <div class="card-grid">
+                <a class="kh-card quick-card" href="my-children">
+                    <div class="feature-icon accent"><Icon Name="heart" Size="24" /></div>
+                    <h2 class="kh-card-title">My children</h2>
+                    <p>Attendance and daily reports for your children.</p>
+                </a>
+                <a class="kh-card quick-card" href="announcements">
+                    <div class="feature-icon success"><Icon Name="bell" Size="24" /></div>
+                    <h2 class="kh-card-title">Announcements</h2>
+                    <p>News from the kindergarten and your child's group.</p>
+                </a>
+            </div>
+        }
+        else
+        {
+            <EmptyState Title="Your account has no role yet" IconName="info"
+                        Message="Please ask the kindergarten administrator to give you access." />
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private CurrentUserInfo user = CurrentUserInfo.Anonymous;
+    private DashboardStatsDto? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await CurrentUserService.GetCurrentUserAsync();
+        if (user.IsAdmin || user.IsTeacher)
+        {
+            stats = await DashboardService.GetStatsAsync();
+        }
+    }
+}
