@@ -115,6 +115,8 @@ KinderHub/
 ```
 
 
+## 👥 Team
+
 | Name | Role in the project |
 |---|---|
 | Farzana Khashi | Full-stack development, testing, documentation |
