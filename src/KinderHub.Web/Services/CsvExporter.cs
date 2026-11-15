@@ -9,6 +9,7 @@ public static class CsvExporter
     public static byte[] Attendance(IEnumerable<AttendanceDto> rows)
     {
         var sb = new StringBuilder();
+        sb.AppendLine("sep=,");
         sb.AppendLine("Date,Child,Status,Check-in,Check-out,Picked up by,Note");
 
         foreach (var r in rows)
