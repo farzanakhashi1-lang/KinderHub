@@ -7,6 +7,7 @@ using KinderHub.Web.Components.Account;
 using KinderHub.Web.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine("DATABASE FOLDER: " + builder.Environment.ContentRootPath);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -49,7 +50,6 @@ var app = builder.Build();
 // Create the database and fill it with demo data
 await app.Services.InitializeDatabaseAsync();
 await app.Services.SeedIdentityAsync();
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

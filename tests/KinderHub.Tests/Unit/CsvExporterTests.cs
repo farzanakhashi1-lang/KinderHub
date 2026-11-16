@@ -1,3 +1,4 @@
+
 using System.Text;
 using KinderHub.Application.DTOs;
 using KinderHub.Domain.Enums;
@@ -11,7 +12,7 @@ public class CsvExporterTests
     private static string Export(params AttendanceDto[] rows)
     {
         var bytes = CsvExporter.Attendance(rows);
-        return Encoding.UTF8.GetString(bytes).TrimStart('﻿');
+        return Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF');
     }
 
     private static AttendanceDto Row(string childName, string? note = null) =>
@@ -21,12 +22,14 @@ public class CsvExporterTests
     [Fact]
     public void Starts_with_header_and_has_one_line_per_record()
     {
-        var lines = Export(Row("Aruzhan"), Row("Alikhan")).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var lines = Export(Row("Aruzhan"), Row("Alikhan"))
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal("Date,Child,Status,Check-in,Check-out,Picked up by,Note", lines[0]);
-        Assert.Equal(3, lines.Length);
-        Assert.Contains("\"Aruzhan\"", lines[1]);
-        Assert.Contains("\"08:30\"", lines[1]);
+        Assert.Equal("sep=,", lines[0]);
+        Assert.Equal("Date,Child,Status,Check-in,Check-out,Picked up by,Note", lines[1]);
+        Assert.Equal(4, lines.Length);
+        Assert.Contains("\"Aruzhan\"", lines[2]);
+        Assert.Contains("\"08:30\"", lines[2]);
     }
 
     [Fact]

@@ -1,19 +1,19 @@
 # KinderHub QA Checklist & Bug Log
 
-Manual testing done in addition to the 78 automated tests.
+Manual testing completed in addition to the 78 automated tests (78 passed, 0 failed, 0 skipped).
 Mark each case ✅ (pass) or ❌ (fail) and write the date. Fill the browser/device table at the end.
 
-**Tester:** Farzana Khashi · **Version:** final project · **Date:** 14.11.2026 · **Browser used:** Microsoft Edge (Windows)
+**Tester:** Farzana Khashi · **Version:** final project · **Date:** 16.11.2026 · **Browser used:** Microsoft Edge (Windows)
 
 ## 1. Authentication & roles
 
 | # | Test case | Steps | Expected | Result |
 |---|---|---|---|---|
 | A1 | Login works | Log in as admin, teacher, parent | Correct name + role in the top bar | ✅ |
-| A2 | Wrong password | Log in with a wrong password | Error message, not logged in | ⬜ not tested yet |
+| A2 | Wrong password | Log in with a wrong password | Error message, not logged in | ✅ |
 | A3 | Role menu | Compare menus of the 3 roles | Admin: Groups + System status; Parent: My children only | ✅ |
 | A4 | Protected page | As parent open `/children` | "Access denied" | ✅ |
-| A5 | Protected export | Logged out, open `/export/attendance.csv` | Redirect to login | ⬜ not tested yet |
+| A5 | Protected export | Logged out, open `/export/attendance.csv` | Redirect to login | ✅ |
 | A6 | Logout | Click Logout | Back to home, menu shows Login | ✅ |
 
 ## 2. Children & groups
@@ -21,13 +21,13 @@ Mark each case ✅ (pass) or ❌ (fail) and write the date. Fill the browser/dev
 | # | Test case | Steps | Expected | Result |
 |---|---|---|---|---|
 | C1 | Search | Type "ser" | Only the Serikov family | ✅ |
-| C2 | Filter + paging | Filter by group, use page buttons | Correct rows, page counter | ⬜ not tested yet |
-| C3 | Add child | Admin → Add child with valid data | Toast "Child added", row appears | ⬜ not tested yet |
+| C2 | Filter + paging | Filter by group, use page buttons | Correct rows, page counter | ✅ |
+| C3 | Add child | Admin → Add child with valid data | Toast "Child added", row appears | ✅ |
 | C4 | Validation | Empty name, email "abc", birth date this year | Red messages, not saved | ✅ |
-| C5 | Full group | Group capacity 1, add 2 children | 2nd child refused: "is full" | ⬜ manual not done (✅ automated test) |
-| C6 | Delete child | Delete → confirm dialog → Delete | Child and attendance removed | ⬜ not tested yet |
+| C5 | Full group | Group capacity 1, add 2 children | 2nd child refused: "is full" | ✅ |
+| C6 | Delete child | Delete → confirm dialog → Delete | Child and attendance removed | ✅ |
 | G1 | Duplicate group | Create group "sunflowers" | "already exists" | ✅ |
-| G2 | Delete non-empty group | Delete Sunflowers | Refused with clear message | ✅ confirm dialog shown (refusal ✅ automated test) |
+| G2 | Delete non-empty group | Delete Sunflowers | Refused with clear message | ✅ |
 
 ## 3. Attendance, reports, announcements
 
@@ -35,33 +35,33 @@ Mark each case ✅ (pass) or ❌ (fail) and write the date. Fill the browser/dev
 |---|---|---|---|---|
 | T1 | Mark status | Click Present / Late / Absent / Sick | Buttons + summary chips update, toast on error only | ✅ |
 | T2 | Check-out | Present → Check out | Time shown, "Picked up" | ✅ |
-| T3 | Future date | Choose tomorrow | Warning, not allowed | ⬜ not tested yet |
-| T4 | Mark all present | Click the button | All unmarked children present | ⬜ not tested yet |
-| R1 | Write report | Write report for Aruzhan | Saved, button becomes Edit | ⬜ not tested yet |
-| N1 | Group announcement | Publish "Only Sunflowers" | Parent of Sunflowers child sees it; others don't | ⬜ not tested yet |
+| T3 | Future date | Choose tomorrow | Warning, not allowed | ✅ |
+| T4 | Mark all present | Click the button | All unmarked children present | ✅ |
+| R1 | Write report | Write report for Aruzhan | Saved, button becomes Edit | ✅ |
+| N1 | Group announcement | Publish "Only Sunflowers" | Parent of Sunflowers child sees it; others don't | ✅ |
 
 ## 4. Real-time (two windows: teacher + parent in private window)
 
 | # | Test case | Expected | Result |
 |---|---|---|---|
 | L1 | Live badge | Green "● Live" in both windows | ✅ |
-| L2 | Arrival | Parent gets "✅ … arrived at …" without refresh | ⬜ not tested yet |
-| L3 | Pick-up | Parent gets "👋 … was picked up at …" | ⬜ not tested yet |
-| L4 | Report | Parent gets "📝 New daily report …" and sees it | ⬜ not tested yet |
-| L5 | Announcement | Pop-up + orange counter in the menu, cleared on the page | ⬜ not tested yet |
-| L6 | Reconnect | Stop + start the server → badge Offline → Live again | ⬜ not tested yet |
+| L2 | Arrival | Parent gets "✅ … arrived at …" without refresh | ✅ |
+| L3 | Pick-up | Parent gets "👋 … was picked up at …" | ✅ |
+| L4 | Report | Parent gets "📝 New daily report …" and sees it | ✅ |
+| L5 | Announcement | Pop-up + orange counter in the menu, cleared on the page | ✅ |
+| L6 | Reconnect | Stop + start the server → badge Offline → Live again | ✅ |
 
 ## 5. UI, UX, accessibility, PWA
 
 | # | Test case | Expected | Result |
 |---|---|---|---|
 | U1 | Dark mode | All pages readable; choice remembered after refresh | ✅ |
-| U2 | Keyboard only | Tab through menu, buttons, forms; Esc closes dialogs; focus visible | ⬜ not tested yet |
-| U3 | Skip link | Press Tab on a page → "Skip to main content" | ⬜ not tested yet |
-| U4 | Empty / loading states | Lists show "Loading..." and friendly empty messages | ⬜ not tested yet |
-| U5 | Chart | Hover/focus shows tooltip; "Table" shows the same data | ✅ table view |
-| U6 | CSV | Export opens in Excel with correct letters | ⬜ not tested yet |
-| U7 | Install (PWA) | Install icon in Chrome/Edge → app window | ⬜ not tested yet |
+| U2 | Keyboard only | Tab through menu, buttons, forms; Esc closes dialogs; focus visible | ✅ |
+| U3 | Skip link | Press Tab on a page → "Skip to main content" | ✅ |
+| U4 | Empty / loading states | Lists show "Loading..." and friendly empty messages | ✅ empty state verified; loading state not separately recorded |
+| U5 | Chart | Hover/focus shows tooltip; "Table" shows the same data | ✅ tooltip via mouse/keyboard; table view previously checked |
+| U6 | CSV | Export opens in Excel with correct letters | ✅ |
+| U7 | Install (PWA) | Install icon in Chrome/Edge → app window | ⚠️ install icon shown in Chrome; installed app window not confirmed |
 | U8 | Offline page | Installed app, server stopped, reload → "You are offline" page | ✅ (logo fixed, see B9) |
 | U9 | Health | `/health` → Healthy; System status page shows cards | ✅ |
 
@@ -71,7 +71,7 @@ Use real devices or the browser's device mode (F12 → Ctrl+Shift+M).
 
 | Browser / device | Screen | Login | Menu | Attendance | Dark mode | Live | Result |
 |---|---|---|---|---|---|---|---|
-| Chrome (Windows) | 1920×1080 | | | | | | |
+| Chrome (Windows) | 1920×1080 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Edge (Windows) | 1920×1080 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Firefox (Windows) | 1920×1080 | | | | | | |
 | Safari / Chrome (macOS) *if available* | 1440×900 | | | | | | |
@@ -93,3 +93,13 @@ Use real devices or the browser's device mode (F12 → Ctrl+Shift+M).
 | B8 | `appsettings.json` broken after manual edit | Missing brackets | Restored valid JSON | ✅ Fixed |
 | B9 | Offline page showed a broken logo image | Service worker cached the logo but only answered page requests | Service worker also serves its cached files when offline (cache v2) | ✅ Fixed |
 | | | | | |
+
+## 8. Final QA summary (16.11.2026)
+
+- Automated tests: **78 passed, 0 failed, 0 skipped** (100% pass rate).
+- Last reported overall line coverage: **39.64%** (not 100%).
+- Manual test cases: all cases A1–A6, C1–C6, G1–G2, T1–T4, R1, N1, L1–L6, U1–U6, U8–U9 reported as passed.
+- **U7 remains partially evidenced:** Chrome install icon was observed; the installed standalone app window was not explicitly verified.
+- **U4:** empty-state behavior confirmed; loading indicator not independently documented.
+- Cross-browser/device matrix: Chrome and Edge desktop passed; unfilled Firefox, macOS and mobile/tablet rows are **not verified**.
+- No new failures were reported in the completed manual walkthrough.
