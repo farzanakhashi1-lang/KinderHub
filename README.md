@@ -114,12 +114,8 @@ KinderHub/
 └─ docs/                         User guide, developer notes, API, QA
 ```
 
-
 ## 👥 Team
 
 | Name | Role in the project |
 |---|---|
 | Farzana Khashi | Full-stack development, testing, documentation |
-| Ulsaya Tileuova | Attendance CSV export, testing |
-| Zhanar Adilkhan | Project development and documentation |
-

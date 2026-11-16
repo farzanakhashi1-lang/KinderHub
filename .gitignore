@@ -487,3 +487,27 @@ $RECYCLE.BIN/
 *.db-wal
 coverage-report/
 TestResults/
+
+# .NET build files
+**/bin/
+**/obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Local configuration and secrets
+**/appsettings.Development.json
+**/secrets.json
+.env
+.env.*
+!.env.example
+
+# Local database files
+*.sqlite
+*.sqlite3
+
+# Test and coverage output
+**/TestResults/
+**/coverage-report/
